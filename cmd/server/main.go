@@ -1,0 +1,202 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+
+	"github.com/ubibot/ubibot-platform-open/internal/api"
+	"github.com/ubibot/ubibot-platform-open/internal/config"
+	"github.com/ubibot/ubibot-platform-open/internal/database"
+	"github.com/ubibot/ubibot-platform-open/internal/ha"
+	"github.com/ubibot/ubibot-platform-open/internal/mqttbroker"
+	"github.com/ubibot/ubibot-platform-open/internal/rule"
+	"github.com/ubibot/ubibot-platform-open/internal/telemetry"
+	"gorm.io/gorm"
+)
+
+// coordinator wires MQTT device events to the telemetry buffer, rule engine,
+// HA client and device status updates. Implements mqttbroker.DeviceEvents.
+type coordinator struct {
+	buffer    *telemetry.Buffer
+	haClient  *ha.Client
+	deviceAPI *api.DeviceAPI
+}
+
+func (co *coordinator) OnTelemetry(deviceID string, payload []byte) {
+	metrics := make(map[string]any)
+	if err := json.Unmarshal(payload, &metrics); err != nil {
+		log.Printf("telemetry parse failed device=%s: %v", deviceID, err)
+		return
+	}
+	now := time.Now()
+	for metric, raw := range metrics {
+		value, ok := toFloat(raw)
+		if !ok {
+			continue
+		}
+		co.buffer.Add(telemetry.Record{
+			DeviceID:  deviceID,
+			Metric:    metric,
+			Value:     value,
+			Timestamp: now,
+		})
+		if co.haClient != nil {
+			co.haClient.PublishState(deviceID, deviceID, metric, value)
+		}
+	}
+	co.deviceAPI.UpdateStatus(deviceID, true)
+}
+
+func (co *coordinator) OnConnect(clientID string) {
+	co.deviceAPI.UpdateStatus(clientID, true)
+}
+
+func (co *coordinator) OnDisconnect(clientID string) {
+	co.deviceAPI.UpdateStatus(clientID, false)
+}
+
+// toFloat converts a JSON-decoded numeric value to float64.
+func toFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(n, 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+func main() {
+	configPath := "config.yaml"
+	if len(os.Args) > 1 {
+		configPath = os.Args[1]
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	db, err := database.Open(cfg.Database.Path)
+	if err != nil {
+		log.Fatalf("open database: %v", err)
+	}
+
+	// Rule engine (loads enabled rules into memory).
+	engine := rule.New(db, nil)
+
+	// Telemetry buffer. The sink fans records out to the rule engine.
+	buffer := telemetry.NewBuffer(db, cfg.Telemetry.BatchSize, cfg.Telemetry.FlushInterval, engine.Match)
+
+	// Home Assistant client (optional).
+	var haClient *ha.Client
+	if cfg.HomeAssistant.Enabled {
+		haClient = ha.New(ha.Config{
+			Broker:          cfg.HomeAssistant.Broker,
+			Username:        cfg.HomeAssistant.Username,
+			Password:        cfg.HomeAssistant.Password,
+			DiscoveryPrefix: cfg.HomeAssistant.DiscoveryPrefix,
+			ClientID:        cfg.HomeAssistant.ClientID,
+		})
+		if err := haClient.Connect(); err != nil {
+			log.Printf("ha client disabled: %v", err)
+			haClient = nil
+		}
+	}
+	engine.SetNotifier(haClient) // wire alert notifications (nil-safe)
+
+	// HTTP API.
+	router := api.NewRouter(db, haClient, engine)
+
+	// Coordinator bridges MQTT events to the rest of the platform.
+	deviceAPI := api.NewDeviceAPI(db, haClient)
+	co := &coordinator{
+		buffer:    buffer,
+		haClient:  haClient,
+		deviceAPI: deviceAPI,
+	}
+
+	// Embedded MQTT broker.
+	broker := mqttbroker.New(cfg.Server.MQTTPort, co)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Start telemetry buffer flusher.
+	go buffer.Run(ctx)
+
+	// Start HTTP server.
+	httpSrv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+	if cfg.Server.HTTPPort != 0 {
+		httpSrv.Addr = ":" + strconv.Itoa(cfg.Server.HTTPPort)
+	}
+	go func() {
+		log.Printf("http server listening on %s", httpSrv.Addr)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("http server: %v", err)
+		}
+	}()
+
+	// Start MQTT broker.
+	if err := broker.Start(); err != nil {
+		log.Fatalf("start mqtt broker: %v", err)
+	}
+
+	// Load rules now that everything is wired.
+	if err := engine.Load(); err != nil {
+		log.Printf("load rules: %v", err)
+	}
+
+	// Telemetry retention cleanup (daily).
+	go runCleanup(ctx, db, cfg.Telemetry.RetentionDays)
+
+	log.Printf("ubibot-platform started: http=:%d mqtt=:%d", cfg.Server.HTTPPort, cfg.Server.MQTTPort)
+	<-ctx.Done()
+	log.Printf("shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = httpSrv.Shutdown(shutdownCtx)
+	broker.Close()
+	if haClient != nil {
+		haClient.Disconnect()
+	}
+	log.Printf("ubibot-platform stopped")
+}
+
+func runCleanup(ctx context.Context, db *gorm.DB, retentionDays int) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if n, err := database.CleanupOldTelemetry(db, retentionDays); err != nil {
+				log.Printf("telemetry cleanup failed: %v", err)
+			} else if n > 0 {
+				log.Printf("telemetry cleanup removed %d old rows", n)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}

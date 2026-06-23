@@ -27,8 +27,15 @@ go.work.sum
 # env file
 .env
 
+# Runtime data (SQLite database, logs)
+data/
+
 # Editor/IDE
 # .idea/
 # .vscode/
 
 CLAUDE.md
+.vscode
+.trae
+project.md
+
