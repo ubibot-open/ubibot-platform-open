@@ -48,11 +48,12 @@ func NewRouter(
 	alertAPI := NewAlertAPI(db)
 	ingestAPI := NewIngestAPI(db, buf, events)
 	cfgAPI := NewDeviceConfigAPI(db, publisher)
+	fieldDefAPI := NewFieldDefAPI(db)
 
 	// Device-facing endpoints (used by firmware).
 	dev := r.Group("/device/v1")
 	{
-		// Telemetry upload – device POSTs sensor readings, receives config in response.
+		// Telemetry upload – device POSTs data points, receives config in response.
 		dev.POST("/telemetry", ingestAPI.Upload)
 
 		// Config poll – device GETs its current sampling configuration.
@@ -71,8 +72,13 @@ func NewRouter(
 		api.PUT("/devices/:device_id/config", cfgAPI.SetDeviceConfig)
 		api.GET("/devices/:device_id/config", cfgAPI.GetDeviceConfig)
 
-		// Telemetry history
+		// Telemetry history  (?field=field1&from=...&to=...&limit=100)
 		api.GET("/devices/:device_id/telemetry", telemetryAPI.Query)
+
+		// Field definitions – maps field1..field20 to display names and units
+		api.GET("/field-definitions", fieldDefAPI.ListFieldDefs)
+		api.PUT("/field-definitions/:device_id/:field_key", fieldDefAPI.SetFieldDef)
+		api.DELETE("/field-definitions/:device_id/:field_key", fieldDefAPI.DeleteFieldDef)
 
 		// Rules
 		api.POST("/rules", ruleAPI.Create)

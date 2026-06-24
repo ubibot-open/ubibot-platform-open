@@ -26,11 +26,13 @@ import (
 	"github.com/ubibot/ubibot-platform-open/internal/models"
 )
 
-// Record is a single telemetry reading queued for batch insertion.
+// Record is a single field reading queued for batch insertion.
+// Value is the raw string received from the device; consumers that need a
+// numeric value should parse it with strconv.ParseFloat.
 type Record struct {
 	DeviceID  string
-	Metric    string
-	Value     float64
+	Field     string // "field1".."field20"
+	Value     string // raw string value
 	Timestamp time.Time
 }
 
@@ -75,7 +77,7 @@ func (b *Buffer) Add(r Record) {
 			b.sink(r)
 		}
 	default:
-		log.Printf("telemetry buffer full, dropping record device=%s metric=%s", r.DeviceID, r.Metric)
+		log.Printf("telemetry buffer full, dropping record device=%s field=%s", r.DeviceID, r.Field)
 	}
 }
 
@@ -101,7 +103,7 @@ func (b *Buffer) Run(ctx context.Context) {
 		case r := <-b.records:
 			batch = append(batch, models.Telemetry{
 				DeviceID:  r.DeviceID,
-				Metric:    r.Metric,
+				Field:     r.Field,
 				Value:     r.Value,
 				Timestamp: r.Timestamp,
 			})
@@ -111,13 +113,13 @@ func (b *Buffer) Run(ctx context.Context) {
 		case <-ticker.C:
 			flush()
 		case <-ctx.Done():
-			// drain remaining queued records before exiting
+			// Drain remaining queued records before exiting.
 			for {
 				select {
 				case r := <-b.records:
 					batch = append(batch, models.Telemetry{
 						DeviceID:  r.DeviceID,
-						Metric:    r.Metric,
+						Field:     r.Field,
 						Value:     r.Value,
 						Timestamp: r.Timestamp,
 					})

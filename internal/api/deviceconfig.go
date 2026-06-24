@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // deviceconfig.go manages per-device configuration (collect/upload intervals,
-// enabled sensors) via the REST API and propagates changes via MQTT.
+// enabled fields) via the REST API and propagates changes via MQTT.
 package api
 
 import (
@@ -56,7 +56,7 @@ func (a *DeviceConfigAPI) GetDeviceConfig(c *gin.Context) {
 type setConfigRequest struct {
 	CollectInterval int      `json:"collect_interval"`
 	UploadInterval  int      `json:"upload_interval"`
-	SensorsEnabled  []string `json:"sensors_enabled"`
+	FieldsEnabled   []string `json:"fields_enabled"` // e.g. ["field1","field2"]
 }
 
 // SetDeviceConfig handles PUT /api/devices/:device_id/config
@@ -77,7 +77,7 @@ func (a *DeviceConfigAPI) SetDeviceConfig(c *gin.Context) {
 		req.UploadInterval = 60
 	}
 
-	enabledJSON, _ := json.Marshal(req.SensorsEnabled)
+	enabledJSON, _ := json.Marshal(req.FieldsEnabled)
 
 	var dc models.DeviceConfig
 	result := a.db.Where("device_id = ?", deviceID).First(&dc)
@@ -86,7 +86,7 @@ func (a *DeviceConfigAPI) SetDeviceConfig(c *gin.Context) {
 	}
 	dc.CollectInterval = req.CollectInterval
 	dc.UploadInterval = req.UploadInterval
-	dc.SensorsEnabled = string(enabledJSON)
+	dc.FieldsEnabled = string(enabledJSON)
 	dc.UpdatedAt = time.Now()
 
 	if err := a.db.Save(&dc).Error; err != nil {
@@ -97,14 +97,14 @@ func (a *DeviceConfigAPI) SetDeviceConfig(c *gin.Context) {
 	payload := protocol.ConfigPayload{
 		CollectInterval: dc.CollectInterval,
 		UploadInterval:  dc.UploadInterval,
-		SensorsEnabled:  req.SensorsEnabled,
+		FieldsEnabled:   req.FieldsEnabled,
 		ServerTime:      time.Now().Unix(),
 	}
 
 	if a.publisher != nil {
 		data, _ := json.Marshal(payload)
 		topic := "ubibot/" + deviceID + "/cmd/config"
-		_ = a.publisher.Publish(topic, data, true) // retained so device gets it on reconnect
+		_ = a.publisher.Publish(topic, data, true)
 	}
 
 	c.JSON(http.StatusOK, payload)

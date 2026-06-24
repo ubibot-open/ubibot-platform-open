@@ -165,14 +165,14 @@ func (s *Server) configForDevice(deviceID string) protocol.ConfigPayload {
 	}
 
 	var enabled []string
-	if dc.SensorsEnabled != "" {
-		_ = json.Unmarshal([]byte(dc.SensorsEnabled), &enabled)
+	if dc.FieldsEnabled != "" {
+		_ = json.Unmarshal([]byte(dc.FieldsEnabled), &enabled)
 	}
 
 	return protocol.ConfigPayload{
 		CollectInterval: dc.CollectInterval,
 		UploadInterval:  dc.UploadInterval,
-		SensorsEnabled:  enabled,
+		FieldsEnabled:   enabled,
 		ServerTime:      time.Now().Unix(),
 	}
 }

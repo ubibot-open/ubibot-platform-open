@@ -48,6 +48,7 @@ func Open(dbPath string) (*gorm.DB, error) {
 		&models.Device{},
 		&models.User{},
 		&models.Rule{},
+		&models.FieldDefinition{},
 		&models.Telemetry{},
 		&models.Alert{},
 		&models.DeviceConfig{},

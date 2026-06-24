@@ -36,15 +36,15 @@ func NewTelemetryAPI(db *gorm.DB) *TelemetryAPI {
 }
 
 // Query returns telemetry records for a device, optionally filtered by
-// metric and a time range. Supports pagination via limit/offset.
+// field key and a time range. Supports pagination via limit/offset.
 //
-// GET /api/devices/:device_id/telemetry?metric=temperature&limit=100&offset=0&from=2024-01-01T00:00:00Z&to=2024-01-02T00:00:00Z
+// GET /api/devices/:device_id/telemetry?field=field1&limit=100&offset=0&from=2024-01-01T00:00:00Z&to=2024-01-02T00:00:00Z
 func (a *TelemetryAPI) Query(c *gin.Context) {
 	deviceID := c.Param("device_id")
 	q := a.db.Model(&models.Telemetry{}).Where("device_id = ?", deviceID)
 
-	if metric := c.Query("metric"); metric != "" {
-		q = q.Where("metric = ?", metric)
+	if field := c.Query("field"); field != "" {
+		q = q.Where("field = ?", field)
 	}
 	if from := c.Query("from"); from != "" {
 		if t, err := time.Parse(time.RFC3339, from); err == nil {

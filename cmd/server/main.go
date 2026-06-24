@@ -17,7 +17,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -32,6 +31,7 @@ import (
 	"github.com/ubibot/ubibot-platform-open/internal/database"
 	"github.com/ubibot/ubibot-platform-open/internal/ha"
 	"github.com/ubibot/ubibot-platform-open/internal/mqttbroker"
+	"github.com/ubibot/ubibot-platform-open/internal/protocol"
 	"github.com/ubibot/ubibot-platform-open/internal/rule"
 	"github.com/ubibot/ubibot-platform-open/internal/telemetry"
 	"gorm.io/gorm"
@@ -45,26 +45,30 @@ type coordinator struct {
 	deviceAPI *api.DeviceAPI
 }
 
+// OnTelemetry handles an uplink telemetry payload from any transport.
+// It parses the TelemetryPayload, fans each DataPoint's field values into
+// the buffer (→ rule engine + DB), and forwards them to Home Assistant.
 func (co *coordinator) OnTelemetry(deviceID string, payload []byte) {
-	metrics := make(map[string]any)
-	if err := json.Unmarshal(payload, &metrics); err != nil {
+	p, err := protocol.ParseTelemetry(payload)
+	if err != nil {
 		log.Printf("telemetry parse failed device=%s: %v", deviceID, err)
 		return
 	}
-	now := time.Now()
-	for metric, raw := range metrics {
-		value, ok := toFloat(raw)
-		if !ok {
-			continue
-		}
-		co.buffer.Add(telemetry.Record{
-			DeviceID:  deviceID,
-			Metric:    metric,
-			Value:     value,
-			Timestamp: now,
-		})
-		if co.haClient != nil {
-			co.haClient.PublishState(deviceID, deviceID, metric, value)
+
+	// Use the payload's device_id when the transport (MQTT) provides it via
+	// the topic; the coordinator always receives the authoritative deviceID.
+	for _, dp := range p.Data {
+		ts := dp.Time()
+		for fieldKey, value := range dp.Fields() {
+			co.buffer.Add(telemetry.Record{
+				DeviceID:  deviceID,
+				Field:     fieldKey,
+				Value:     value,
+				Timestamp: ts,
+			})
+			if co.haClient != nil {
+				co.haClient.PublishState(deviceID, deviceID, fieldKey, value)
+			}
 		}
 	}
 	co.deviceAPI.UpdateStatus(deviceID, true)
@@ -76,27 +80,6 @@ func (co *coordinator) OnConnect(clientID string) {
 
 func (co *coordinator) OnDisconnect(clientID string) {
 	co.deviceAPI.UpdateStatus(clientID, false)
-}
-
-// toFloat converts a JSON-decoded numeric value to float64.
-func toFloat(v any) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case float32:
-		return float64(n), true
-	case int:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	case json.Number:
-		f, err := n.Float64()
-		return f, err == nil
-	case string:
-		f, err := strconv.ParseFloat(n, 64)
-		return f, err == nil
-	}
-	return 0, false
 }
 
 func main() {

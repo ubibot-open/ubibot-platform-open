@@ -22,90 +22,130 @@ import (
 	"time"
 )
 
-// Known sensor field names used in TelemetryPayload.Sensors.
-// Hardware firmware should use these exact keys.
-const (
-	SensorTemperature    = "temperature"     // °C, float
-	SensorHumidity       = "humidity"        // % RH, float
-	SensorLight          = "light"           // lux, float
-	SensorVibration      = "vibration"       // m/s², float
-	SensorSoilNitrogen   = "soil_nitrogen"   // mg/kg, float
-	SensorSoilPhosphorus = "soil_phosphorus" // mg/kg, float
-	SensorSoilPotassium  = "soil_potassium"  // mg/kg, float
-	SensorBattery        = "battery"         // %, float
-	SensorSignal         = "signal"          // dBm, int
-	SensorPressure       = "pressure"        // hPa, float
-	SensorCO2            = "co2"             // ppm, float
-)
+// MaxFields is the number of generic field slots available per data point.
+const MaxFields = 20
 
-// TelemetryPayload is the canonical uplink message from a device.
-// All three transports (MQTT, HTTP, CoAP) parse into this struct.
+// FieldKeys returns the canonical JSON key for the 1-based field index n.
+// Panics if n is outside [1, MaxFields].
+func FieldKey(n int) string {
+	if n < 1 || n > MaxFields {
+		panic(fmt.Sprintf("field index %d out of range [1,%d]", n, MaxFields))
+	}
+	return fmt.Sprintf("field%d", n)
+}
+
+// DataPoint is a single timed measurement from a device.
+// Each upload may contain multiple DataPoints so devices can batch readings
+// collected over a longer interval into a single transmission.
+//
+// All field values are strings. Numeric values should be formatted as their
+// decimal representation (e.g. "25.6"); boolean values as "0"/"1" or
+// "true"/"false". The platform stores the raw string without conversion.
 //
 // JSON example:
 //
 //	{
+//	  "timestamp": 1735000000,
+//	  "field1": "25.6",
+//	  "field2": "60.2",
+//	  "field3": "1200"
+//	}
+type DataPoint struct {
+	// Timestamp is the Unix second epoch at which the device collected this
+	// reading. The platform substitutes the server receive time when absent.
+	Timestamp int64  `json:"timestamp,omitempty"`
+	Field1    string `json:"field1,omitempty"`
+	Field2    string `json:"field2,omitempty"`
+	Field3    string `json:"field3,omitempty"`
+	Field4    string `json:"field4,omitempty"`
+	Field5    string `json:"field5,omitempty"`
+	Field6    string `json:"field6,omitempty"`
+	Field7    string `json:"field7,omitempty"`
+	Field8    string `json:"field8,omitempty"`
+	Field9    string `json:"field9,omitempty"`
+	Field10   string `json:"field10,omitempty"`
+	Field11   string `json:"field11,omitempty"`
+	Field12   string `json:"field12,omitempty"`
+	Field13   string `json:"field13,omitempty"`
+	Field14   string `json:"field14,omitempty"`
+	Field15   string `json:"field15,omitempty"`
+	Field16   string `json:"field16,omitempty"`
+	Field17   string `json:"field17,omitempty"`
+	Field18   string `json:"field18,omitempty"`
+	Field19   string `json:"field19,omitempty"`
+	Field20   string `json:"field20,omitempty"`
+}
+
+// Time returns the data point timestamp as a time.Time, falling back to now.
+func (d DataPoint) Time() time.Time {
+	if d.Timestamp == 0 {
+		return time.Now()
+	}
+	return time.Unix(d.Timestamp, 0)
+}
+
+// Fields returns all non-empty field key→value pairs in this data point.
+func (d DataPoint) Fields() map[string]string {
+	vals := [MaxFields]string{
+		d.Field1, d.Field2, d.Field3, d.Field4, d.Field5,
+		d.Field6, d.Field7, d.Field8, d.Field9, d.Field10,
+		d.Field11, d.Field12, d.Field13, d.Field14, d.Field15,
+		d.Field16, d.Field17, d.Field18, d.Field19, d.Field20,
+	}
+	m := make(map[string]string, MaxFields)
+	for i, v := range vals {
+		if v != "" {
+			m[fmt.Sprintf("field%d", i+1)] = v
+		}
+	}
+	return m
+}
+
+// TelemetryPayload is the canonical uplink message from a device.
+// A single upload may carry one or more DataPoints, allowing devices to batch
+// readings collected while offline or between upload intervals.
+//
+// JSON example (two batched readings):
+//
+//	{
 //	  "device_id": "DEV001",
 //	  "token":     "abc123...",
-//	  "timestamp": 1735000000,
-//	  "sensors": {
-//	    "temperature": 25.6,
-//	    "humidity":    60.2,
-//	    "light":       1200,
-//	    "vibration":   0.02,
-//	    "soil_nitrogen":   45,
-//	    "soil_phosphorus": 30,
-//	    "soil_potassium":  80,
-//	    "battery": 85.0,
-//	    "signal":  -67
-//	  }
+//	  "data": [
+//	    { "timestamp": 1735000000, "field1": "25.6", "field2": "60.2" },
+//	    { "timestamp": 1735000030, "field1": "25.8", "field2": "59.9", "field3": "1180" }
+//	  ]
 //	}
 type TelemetryPayload struct {
 	// DeviceID identifies the sender. Required for HTTP and CoAP; for MQTT it
-	// may be omitted because the topic already carries the device id.
+	// may be omitted because the topic already carries the device ID.
 	DeviceID string `json:"device_id,omitempty"`
 
 	// Token is the per-device secret used for HTTP/CoAP authentication.
 	// MQTT relies on broker-level credentials instead.
 	Token string `json:"token,omitempty"`
 
-	// Timestamp is a Unix second epoch. If zero the server substitutes now().
-	Timestamp int64 `json:"timestamp,omitempty"`
-
-	// Sensors holds one or more sensor readings keyed by SensorXxx constants.
-	Sensors map[string]json.Number `json:"sensors"`
-}
-
-// Time returns the payload timestamp as a time.Time. Falls back to now when
-// Timestamp is zero.
-func (p *TelemetryPayload) Time() time.Time {
-	if p.Timestamp == 0 {
-		return time.Now()
-	}
-	return time.Unix(p.Timestamp, 0)
-}
-
-// SensorFloat64 returns the float64 value for the given sensor key together
-// with a boolean indicating whether the key was present and parseable.
-func (p *TelemetryPayload) SensorFloat64(key string) (float64, bool) {
-	n, ok := p.Sensors[key]
-	if !ok {
-		return 0, false
-	}
-	f, err := n.Float64()
-	return f, err == nil
+	// Data holds one or more timed measurements. Must contain at least one
+	// DataPoint with at least one non-empty field.
+	Data []DataPoint `json:"data"`
 }
 
 // ParseTelemetry decodes raw JSON bytes into a TelemetryPayload and performs
 // basic validation.
-func ParseTelemetry(data []byte) (*TelemetryPayload, error) {
+func ParseTelemetry(raw []byte) (*TelemetryPayload, error) {
 	var p TelemetryPayload
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, fmt.Errorf("unmarshal telemetry: %w", err)
 	}
-	if len(p.Sensors) == 0 {
-		return nil, fmt.Errorf("telemetry payload has no sensors")
+	if len(p.Data) == 0 {
+		return nil, fmt.Errorf("telemetry payload has no data points")
 	}
-	return &p, nil
+	// Ensure at least one data point has at least one field.
+	for _, dp := range p.Data {
+		if len(dp.Fields()) > 0 {
+			return &p, nil
+		}
+	}
+	return nil, fmt.Errorf("all data points are empty")
 }
 
 // ConfigPayload is the downlink message the server sends to a device in
@@ -116,7 +156,7 @@ func ParseTelemetry(data []byte) (*TelemetryPayload, error) {
 //	{
 //	  "collect_interval": 30,
 //	  "upload_interval":  60,
-//	  "sensors_enabled": ["temperature","humidity","light"],
+//	  "fields_enabled": ["field1","field2","field3"],
 //	  "server_time":      1735000000
 //	}
 type ConfigPayload struct {
@@ -124,24 +164,25 @@ type ConfigPayload struct {
 	CollectInterval int `json:"collect_interval"`
 
 	// UploadInterval is how often (seconds) the firmware transmits buffered
-	// readings to the platform.
+	// data points to the platform.
 	UploadInterval int `json:"upload_interval"`
 
-	// SensorsEnabled lists the sensor keys the device should collect.
-	// An empty slice means "collect all available sensors".
-	SensorsEnabled []string `json:"sensors_enabled,omitempty"`
+	// FieldsEnabled lists the field keys the device should collect.
+	// An empty slice means "collect all available fields".
+	FieldsEnabled []string `json:"fields_enabled,omitempty"`
 
-	// ServerTime is the current Unix epoch the server stamps on every config
-	// response so devices can synchronise their clocks.
+	// ServerTime is the current Unix epoch stamped by the platform so devices
+	// can synchronise their clocks.
 	ServerTime int64 `json:"server_time"`
 }
 
 // HeartbeatPayload is an optional uplink the device sends to signal liveness
-// without uploading full telemetry.
+// without uploading a full data package.
 type HeartbeatPayload struct {
 	DeviceID  string `json:"device_id,omitempty"`
 	Token     string `json:"token,omitempty"`
 	Timestamp int64  `json:"timestamp,omitempty"`
-	Battery   float64 `json:"battery,omitempty"`
-	Signal    int    `json:"signal,omitempty"`
+	// Field values that are cheap to transmit with every heartbeat (e.g. battery, signal).
+	Field1 string `json:"field1,omitempty"`
+	Field2 string `json:"field2,omitempty"`
 }

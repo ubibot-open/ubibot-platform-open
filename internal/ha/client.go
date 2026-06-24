@@ -20,18 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
-// Default metrics published as HA entities when a device registers.
-var defaultMetrics = []Metric{
-	{ID: "temperature", Name: "Temperature", Unit: "°C", Class: "temperature"},
-	{ID: "humidity", Name: "Humidity", Unit: "%", Class: "humidity"},
-	{ID: "battery", Name: "Battery", Unit: "%", Class: "battery"},
+// defaultFields lists the field slots announced as HA entities when a device
+// registers, before any user-defined field definitions are configured.
+var defaultFields = []Metric{
+	{ID: "field1", Name: "Field 1"},
+	{ID: "field2", Name: "Field 2"},
+	{ID: "field3", Name: "Field 3"},
 }
 
 // Metric describes a sensor entity exposed to Home Assistant.
@@ -93,26 +93,27 @@ func (c *Client) Disconnect() {
 	}
 }
 
-// PublishDeviceDiscovery sends HA discovery messages for the default
-// metrics of a device. Called when a device is registered.
+// PublishDeviceDiscovery sends HA discovery messages for the default field
+// slots of a newly registered device.
 func (c *Client) PublishDeviceDiscovery(deviceID, deviceName string) {
-	for _, m := range defaultMetrics {
+	for _, m := range defaultFields {
 		c.publishDiscovery(deviceID, deviceName, m)
 	}
 }
 
-// PublishState pushes a single metric value to HA's state topic.
-// If discovery for the metric has not been published yet, it is published
-// on demand so unknown metrics still appear in HA.
-func (c *Client) PublishState(deviceID, deviceName, metric string, value float64) {
+// PublishState pushes a single field value to HA's state topic.
+// If discovery for the field has not been published yet, it is published
+// on demand so new fields automatically appear in HA.
+func (c *Client) PublishState(deviceID, deviceName, fieldKey, value string) {
 	if c.client == nil || !c.client.IsConnected() {
 		return
 	}
-	if _, ok := c.published.Load(discoveryKey(deviceID, metric)); !ok {
-		c.publishDiscovery(deviceID, deviceName, Metric{ID: metric, Name: metric, Class: metricClass(metric)})
+	if _, ok := c.published.Load(discoveryKey(deviceID, fieldKey)); !ok {
+		c.publishDiscovery(deviceID, deviceName, Metric{ID: fieldKey, Name: fieldKey})
 	}
-	stateTopic := stateTopic(c.cfg.DiscoveryPrefix, deviceID, metric)
-	token := c.client.Publish(stateTopic, 0, false, formatValue(value))
+	topic := stateTopic(c.cfg.DiscoveryPrefix, deviceID, fieldKey)
+	body, _ := json.Marshal(map[string]any{"value": value})
+	token := c.client.Publish(topic, 0, false, string(body))
 	token.Wait()
 }
 
@@ -167,19 +168,6 @@ func (c *Client) PublishAlert(deviceID string, alert map[string]any) {
 	c.client.Publish(topic, 0, false, body)
 }
 
-func metricClass(metric string) string {
-	switch strings.ToLower(metric) {
-	case "temperature":
-		return "temperature"
-	case "humidity":
-		return "humidity"
-	case "battery":
-		return "battery"
-	default:
-		return ""
-	}
-}
-
 func discoveryKey(deviceID, metric string) string {
 	return deviceID + ":" + metric
 }
@@ -192,7 +180,3 @@ func stateTopic(prefix, deviceID, metric string) string {
 	return fmt.Sprintf("%s/sensor/%s/%s/state", prefix, deviceID, metric)
 }
 
-func formatValue(value float64) string {
-	body, _ := json.Marshal(map[string]any{"value": value})
-	return string(body)
-}

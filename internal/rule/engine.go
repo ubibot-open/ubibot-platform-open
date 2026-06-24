@@ -18,6 +18,7 @@ package rule
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
 
 	"gorm.io/gorm"
@@ -32,11 +33,13 @@ type AlertNotifier interface {
 }
 
 // Engine holds alerting rules in memory and evaluates telemetry against them.
+// Rules reference field keys ("field1".."field20"); the string value from the
+// device is parsed as float64 before the threshold comparison.
 type Engine struct {
 	db       *gorm.DB
 	notifier AlertNotifier
 	mu       sync.RWMutex
-	rules    map[string][]models.Rule // key: deviceID:metric
+	rules    map[string][]models.Rule // key: "deviceID:fieldKey"
 }
 
 // New creates a rule engine backed by db. notifier may be nil.
@@ -79,26 +82,34 @@ func (e *Engine) Reload() error {
 
 // Match evaluates a telemetry record against loaded rules and triggers
 // alerts for any matching rule. Implements telemetry.Sink.
+// The record's string Value is parsed as float64 for numeric comparison;
+// unparseable values are silently skipped.
 func (e *Engine) Match(r telemetry.Record) {
+	numericValue, err := strconv.ParseFloat(r.Value, 64)
+	if err != nil {
+		// Non-numeric field values cannot trigger threshold rules.
+		return
+	}
+
 	e.mu.RLock()
-	rules := e.rules[ruleKey(r.DeviceID, r.Metric)]
+	rules := e.rules[ruleKey(r.DeviceID, r.Field)]
 	notifier := e.notifier
 	e.mu.RUnlock()
 
 	for _, rule := range rules {
-		if !evaluate(r.Value, rule.Operator, rule.Threshold) {
+		if !evaluate(numericValue, rule.Operator, rule.Threshold) {
 			continue
 		}
-		e.trigger(r, rule, notifier)
+		e.trigger(r, numericValue, rule, notifier)
 	}
 }
 
-func (e *Engine) trigger(r telemetry.Record, rule models.Rule, notifier AlertNotifier) {
-	msg := fmt.Sprintf("%s %s %.2f on device %s", r.Metric, rule.Operator, rule.Threshold, r.DeviceID)
+func (e *Engine) trigger(r telemetry.Record, numVal float64, rule models.Rule, notifier AlertNotifier) {
+	msg := fmt.Sprintf("%s %s %.4g on device %s", r.Field, rule.Operator, rule.Threshold, r.DeviceID)
 	alert := models.Alert{
 		DeviceID: r.DeviceID,
 		RuleID:   rule.ID,
-		Metric:   r.Metric,
+		Field:    r.Field,
 		Value:    r.Value,
 		Message:  msg,
 	}
@@ -109,7 +120,7 @@ func (e *Engine) trigger(r telemetry.Record, rule models.Rule, notifier AlertNot
 	if notifier != nil {
 		notifier.PublishAlert(r.DeviceID, map[string]any{
 			"device_id": r.DeviceID,
-			"metric":    r.Metric,
+			"field":     r.Field,
 			"value":     r.Value,
 			"rule_id":   rule.ID,
 			"message":   msg,
@@ -136,6 +147,6 @@ func evaluate(value float64, operator string, threshold float64) bool {
 	}
 }
 
-func ruleKey(deviceID, metric string) string {
-	return deviceID + ":" + metric
+func ruleKey(deviceID, fieldKey string) string {
+	return deviceID + ":" + fieldKey
 }

@@ -52,8 +52,9 @@ func NewIngestAPI(db *gorm.DB, buf *telemetry.Buffer, events DeviceEventSink) *I
 // Authentication: the device must supply its token in the X-Device-Token
 // header or in the JSON body's "token" field.
 //
-// On success the server returns HTTP 200 with the current device config so the
-// device can update its sampling parameters in one round-trip.
+// The request body must be a JSON-encoded TelemetryPayload containing one or
+// more DataPoints. On success the platform returns the current ConfigPayload
+// so the device can update its sampling parameters in the same round-trip.
 func (a *IngestAPI) Upload(c *gin.Context) {
 	raw, err := io.ReadAll(c.Request.Body)
 	if err != nil {
@@ -82,10 +83,10 @@ func (a *IngestAPI) Upload(c *gin.Context) {
 		return
 	}
 
-	// Feed to shared coordinator path (rule engine + HA + DB).
+	// Delegate to the shared coordinator (rule engine + HA + DB).
 	a.events.OnTelemetry(p.DeviceID, raw)
 
-	// Return the device config so the device can update its sampling parameters
+	// Return the current device config so the device can update its parameters
 	// without a separate round-trip.
 	cfg := configForDevice(a.db, p.DeviceID)
 	c.JSON(http.StatusOK, cfg)
@@ -96,7 +97,6 @@ func (a *IngestAPI) Upload(c *gin.Context) {
 func configForDevice(db *gorm.DB, deviceID string) protocol.ConfigPayload {
 	var dc models.DeviceConfig
 	if err := db.Where("device_id = ?", deviceID).First(&dc).Error; err != nil {
-		// Return sensible defaults when no record exists yet.
 		return protocol.ConfigPayload{
 			CollectInterval: 30,
 			UploadInterval:  60,
@@ -105,8 +105,8 @@ func configForDevice(db *gorm.DB, deviceID string) protocol.ConfigPayload {
 	}
 
 	var enabled []string
-	if dc.SensorsEnabled != "" {
-		if err := json.Unmarshal([]byte(dc.SensorsEnabled), &enabled); err != nil {
+	if dc.FieldsEnabled != "" {
+		if err := json.Unmarshal([]byte(dc.FieldsEnabled), &enabled); err != nil {
 			enabled = nil
 		}
 	}
@@ -114,7 +114,7 @@ func configForDevice(db *gorm.DB, deviceID string) protocol.ConfigPayload {
 	return protocol.ConfigPayload{
 		CollectInterval: dc.CollectInterval,
 		UploadInterval:  dc.UploadInterval,
-		SensorsEnabled:  enabled,
+		FieldsEnabled:   enabled,
 		ServerTime:      time.Now().Unix(),
 	}
 }
