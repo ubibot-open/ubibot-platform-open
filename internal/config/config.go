@@ -27,6 +27,7 @@ type Config struct {
 	Server struct {
 		HTTPPort int `yaml:"http_port"`
 		MQTTPort int `yaml:"mqtt_port"`
+		CoAPPort int `yaml:"coap_port"`
 	} `yaml:"server"`
 
 	Database struct {
@@ -74,6 +75,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Server.MQTTPort == 0 {
 		c.Server.MQTTPort = 1883
+	}
+	if c.Server.CoAPPort == 0 {
+		c.Server.CoAPPort = 5683
 	}
 	if c.Database.Path == "" {
 		c.Database.Path = "./data/ubibot.db"

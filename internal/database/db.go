@@ -50,6 +50,7 @@ func Open(dbPath string) (*gorm.DB, error) {
 		&models.Rule{},
 		&models.Telemetry{},
 		&models.Alert{},
+		&models.DeviceConfig{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}

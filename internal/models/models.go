@@ -71,6 +71,20 @@ type Telemetry struct {
 
 func (Telemetry) TableName() string { return "telemetry" }
 
+// DeviceConfig stores the configuration the platform pushes down to a device.
+// When a device polls /device/v1/config or the MQTT cmd/config topic, this
+// record is serialised as a protocol.ConfigPayload.
+type DeviceConfig struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	DeviceID        string    `gorm:"uniqueIndex;column:device_id;not null" json:"device_id"`
+	CollectInterval int       `gorm:"column:collect_interval;default:30" json:"collect_interval"`
+	UploadInterval  int       `gorm:"column:upload_interval;default:60" json:"upload_interval"`
+	SensorsEnabled  string    `gorm:"column:sensors_enabled" json:"sensors_enabled"` // comma-separated list; empty = all
+	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
+}
+
+func (DeviceConfig) TableName() string { return "device_configs" }
+
 // Alert records a triggered rule event.
 type Alert struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`

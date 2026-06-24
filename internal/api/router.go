@@ -22,10 +22,22 @@ import (
 
 	"github.com/ubibot/ubibot-platform-open/internal/ha"
 	"github.com/ubibot/ubibot-platform-open/internal/rule"
+	"github.com/ubibot/ubibot-platform-open/internal/telemetry"
 )
 
 // NewRouter builds the Gin engine with all REST routes registered.
-func NewRouter(db *gorm.DB, haClient *ha.Client, engine *rule.Engine) *gin.Engine {
+//
+// Route groups:
+//   - /device/v1  – device-facing endpoints (telemetry upload, config poll)
+//   - /api        – operator/app-facing REST API
+func NewRouter(
+	db *gorm.DB,
+	haClient *ha.Client,
+	engine *rule.Engine,
+	buf *telemetry.Buffer,
+	events DeviceEventSink,
+	publisher ConfigPublisher,
+) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -34,7 +46,20 @@ func NewRouter(db *gorm.DB, haClient *ha.Client, engine *rule.Engine) *gin.Engin
 	telemetryAPI := NewTelemetryAPI(db)
 	ruleAPI := NewRuleAPI(db, engine)
 	alertAPI := NewAlertAPI(db)
+	ingestAPI := NewIngestAPI(db, buf, events)
+	cfgAPI := NewDeviceConfigAPI(db, publisher)
 
+	// Device-facing endpoints (used by firmware).
+	dev := r.Group("/device/v1")
+	{
+		// Telemetry upload – device POSTs sensor readings, receives config in response.
+		dev.POST("/telemetry", ingestAPI.Upload)
+
+		// Config poll – device GETs its current sampling configuration.
+		dev.GET("/config/:device_id", cfgAPI.GetDeviceConfig)
+	}
+
+	// Operator / app-facing REST API.
 	api := r.Group("/api")
 	{
 		// Devices
@@ -42,7 +67,11 @@ func NewRouter(db *gorm.DB, haClient *ha.Client, engine *rule.Engine) *gin.Engin
 		api.GET("/devices", deviceAPI.List)
 		api.GET("/devices/:device_id", deviceAPI.Get)
 
-		// Telemetry
+		// Device configuration management
+		api.PUT("/devices/:device_id/config", cfgAPI.SetDeviceConfig)
+		api.GET("/devices/:device_id/config", cfgAPI.GetDeviceConfig)
+
+		// Telemetry history
 		api.GET("/devices/:device_id/telemetry", telemetryAPI.Query)
 
 		// Rules

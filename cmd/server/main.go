@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/ubibot/ubibot-platform-open/internal/api"
+	"github.com/ubibot/ubibot-platform-open/internal/coap"
 	"github.com/ubibot/ubibot-platform-open/internal/config"
 	"github.com/ubibot/ubibot-platform-open/internal/database"
 	"github.com/ubibot/ubibot-platform-open/internal/ha"
@@ -137,10 +138,7 @@ func main() {
 	}
 	engine.SetNotifier(haClient) // wire alert notifications (nil-safe)
 
-	// HTTP API.
-	router := api.NewRouter(db, haClient, engine)
-
-	// Coordinator bridges MQTT events to the rest of the platform.
+	// Coordinator bridges transport events to the rest of the platform.
 	deviceAPI := api.NewDeviceAPI(db, haClient)
 	co := &coordinator{
 		buffer:    buffer,
@@ -151,6 +149,12 @@ func main() {
 	// Embedded MQTT broker.
 	broker := mqttbroker.New(cfg.Server.MQTTPort, co)
 
+	// HTTP API (needs coordinator and broker for ingest / config push).
+	router := api.NewRouter(db, haClient, engine, buffer, co, broker)
+
+	// CoAP server.
+	coapSrv := coap.New(cfg.Server.CoAPPort, db, co)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -159,11 +163,8 @@ func main() {
 
 	// Start HTTP server.
 	httpSrv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + strconv.Itoa(cfg.Server.HTTPPort),
 		Handler: router,
-	}
-	if cfg.Server.HTTPPort != 0 {
-		httpSrv.Addr = ":" + strconv.Itoa(cfg.Server.HTTPPort)
 	}
 	go func() {
 		log.Printf("http server listening on %s", httpSrv.Addr)
@@ -177,6 +178,11 @@ func main() {
 		log.Fatalf("start mqtt broker: %v", err)
 	}
 
+	// Start CoAP server.
+	if err := coapSrv.Start(ctx); err != nil {
+		log.Fatalf("start coap server: %v", err)
+	}
+
 	// Load rules now that everything is wired.
 	if err := engine.Load(); err != nil {
 		log.Printf("load rules: %v", err)
@@ -185,7 +191,8 @@ func main() {
 	// Telemetry retention cleanup (daily).
 	go runCleanup(ctx, db, cfg.Telemetry.RetentionDays)
 
-	log.Printf("ubibot-platform started: http=:%d mqtt=:%d", cfg.Server.HTTPPort, cfg.Server.MQTTPort)
+	log.Printf("ubibot-platform started: http=:%d mqtt=:%d coap=:%d",
+		cfg.Server.HTTPPort, cfg.Server.MQTTPort, cfg.Server.CoAPPort)
 	<-ctx.Done()
 	log.Printf("shutting down...")
 
