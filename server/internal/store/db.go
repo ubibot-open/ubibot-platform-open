@@ -48,6 +48,14 @@ func Open(path string) (*Store, error) {
 		&model.AdminUser{},
 		&model.AdminSession{},
 		&model.AuditLog{},
+		&model.Firmware{},
+		&model.DeviceOTA{},
+		&model.Notification{},
+		&model.ScheduledTask{},
+		&model.ApiKey{},
+		&model.FileAsset{},
+		&model.DictEntry{},
+		&model.SystemParam{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}

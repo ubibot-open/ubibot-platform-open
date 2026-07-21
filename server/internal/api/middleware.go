@@ -61,6 +61,25 @@ func (s *Server) RequirePermission(code string, next http.HandlerFunc) http.Hand
 	})
 }
 
+// RequireApiKey gates the read-only /api/open/v1 surface — a separate
+// credential from admin sessions (RequireAdmin) and device tokens,
+// carried in X-Api-Key rather than Authorization so it can't be confused
+// with either.
+func (s *Server) RequireApiKey(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := r.Header.Get("X-Api-Key")
+		if key == "" {
+			adminErr(w, 401, "missing api key")
+			return
+		}
+		if _, err := s.Store.ValidateApiKey(key); err != nil {
+			adminErr(w, 401, "invalid or revoked api key")
+			return
+		}
+		next(w, r)
+	}
+}
+
 func currentAdmin(r *http.Request) *model.AdminUser {
 	admin, _ := r.Context().Value(adminUserContextKey).(*model.AdminUser)
 	return admin

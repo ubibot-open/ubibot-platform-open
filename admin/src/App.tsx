@@ -14,6 +14,13 @@ import AlertPage from './pages/Alert'
 import AdminUserPage from './pages/System/Admin'
 import RolePage from './pages/System/Role'
 import AuditLogPage from './pages/System/Log'
+import SchedulePage from './pages/System/Schedule'
+import FirmwarePage from './pages/System/Firmware'
+import ApiKeyPage from './pages/System/ApiKey'
+import FilesPage from './pages/System/Files'
+import DictPage from './pages/System/Dict'
+import ParamsPage from './pages/System/Params'
+import SystemMonitorPage from './pages/System/Monitor'
 
 export default function App() {
   const { mode } = useThemeMode()
@@ -43,9 +50,16 @@ export default function App() {
               <Route path="/monitor" element={<MonitorPage />} />
               <Route path="/command" element={<CommandPage />} />
               <Route path="/alert" element={<AlertPage />} />
+              <Route path="/schedule" element={<SchedulePage />} />
+              <Route path="/firmware" element={<FirmwarePage />} />
               <Route path="/system/admin" element={<AdminUserPage />} />
               <Route path="/system/role" element={<RolePage />} />
               <Route path="/system/log" element={<AuditLogPage />} />
+              <Route path="/system/apikey" element={<ApiKeyPage />} />
+              <Route path="/system/files" element={<FilesPage />} />
+              <Route path="/system/dict" element={<DictPage />} />
+              <Route path="/system/params" element={<ParamsPage />} />
+              <Route path="/system/monitor" element={<SystemMonitorPage />} />
               <Route path="/system" element={<Navigate to="/system/admin" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

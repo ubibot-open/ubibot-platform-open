@@ -18,17 +18,35 @@ var ErrNotFound = errors.New("not found")
 // instant one upload is a few seconds late.
 const MinOfflineGrace = 2 * time.Minute
 
+// minOfflineGraceOverride lets the "offline_grace_minutes" system
+// parameter (see param.go, wired from main.go) raise the floor above the
+// MinOfflineGrace default without needing a code change. Zero means "no
+// override, use the constant" — tests never touch this, so existing
+// online/offline assertions keep their fixed 2-minute floor.
+var minOfflineGraceOverride time.Duration
+
+// SetMinOfflineGrace overrides the offline-grace floor at runtime. Pass 0
+// to fall back to the MinOfflineGrace constant.
+func SetMinOfflineGrace(d time.Duration) {
+	minOfflineGraceOverride = d
+}
+
 // IsDeviceOnline applies the same "quiet for longer than 3x its upload
-// interval (floored at MinOfflineGrace)" rule the offline-alert sweep uses
-// (see OfflineSweep in alert.go) — used here so the admin device list/detail
-// view and the alert system never disagree about what "online" means.
+// interval (floored at the offline-grace floor)" rule the offline-alert
+// sweep uses (see OfflineSweep in alert.go) — used here so the admin
+// device list/detail view and the alert system never disagree about what
+// "online" means.
 func IsDeviceOnline(dev *model.Device, now time.Time) bool {
 	if dev.LastSeenAt == nil {
 		return false
 	}
+	floor := MinOfflineGrace
+	if minOfflineGraceOverride > 0 {
+		floor = minOfflineGraceOverride
+	}
 	grace := time.Duration(dev.UI) * 3 * time.Second
-	if grace < MinOfflineGrace {
-		grace = MinOfflineGrace
+	if grace < floor {
+		grace = floor
 	}
 	return now.Sub(*dev.LastSeenAt) <= grace
 }

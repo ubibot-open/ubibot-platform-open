@@ -9,6 +9,7 @@ import {
   Input,
   InputNumber,
   Popconfirm,
+  Progress,
   Row,
   Select,
   Space,
@@ -18,7 +19,7 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ArrowLeftOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CloudUploadOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
 import {
   dispatchCommand,
   getDevice,
@@ -31,6 +32,7 @@ import {
   type Probe,
 } from '../../api/device'
 import { listAlertRules, createAlertRule, deleteAlertRule, type AlertRule } from '../../api/alert'
+import { listFirmware, getDeviceOta, dispatchDeviceOta, cancelDeviceOta, type Firmware, type DeviceOta } from '../../api/ota'
 import { ApiError } from '../../api/client'
 
 const statusTag: Record<DeviceCommand['status'], { color: string; text: string }> = {
@@ -49,6 +51,17 @@ const probeStatusTag: Record<Probe['status'], { color: string; text: string }> =
   applied: { color: 'success', text: '已生效' },
   failed: { color: 'error', text: '失败' },
   removing: { color: 'warning', text: '删除中' },
+}
+
+const otaStateTag: Record<DeviceOta['state'], { color: string; text: string }> = {
+  pending: { color: 'default', text: '待开始' },
+  downloading: { color: 'processing', text: '下载中' },
+  verifying: { color: 'processing', text: '校验中' },
+  flashing: { color: 'processing', text: '烧录中' },
+  rebooting: { color: 'processing', text: '重启中' },
+  success: { color: 'success', text: '升级成功' },
+  failed: { color: 'error', text: '升级失败' },
+  rolled_back: { color: 'error', text: '已回滚' },
 }
 
 export default function DeviceDetailPage() {
@@ -70,6 +83,11 @@ export default function DeviceDetailPage() {
   const [alertRules, setAlertRules] = useState<AlertRule[]>([])
   const [ruleSubmitting, setRuleSubmitting] = useState(false)
   const [ruleForm] = Form.useForm()
+
+  const [firmwareList, setFirmwareList] = useState<Firmware[]>([])
+  const [selectedFirmwareId, setSelectedFirmwareId] = useState<number | undefined>(undefined)
+  const [ota, setOta] = useState<DeviceOta | null>(null)
+  const [otaSubmitting, setOtaSubmitting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -103,11 +121,59 @@ export default function DeviceDetailPage() {
     }
   }, [deviceId])
 
+  const loadOta = useCallback(async () => {
+    try {
+      const res = await getDeviceOta(deviceId)
+      setOta(res.ota)
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '加载OTA状态失败')
+    }
+  }, [deviceId])
+
   useEffect(() => {
     load()
     loadProbes()
     loadAlertRules()
-  }, [load, loadProbes, loadAlertRules])
+    loadOta()
+    listFirmware()
+      .then((res) => setFirmwareList(res.list))
+      .catch(() => undefined)
+  }, [load, loadProbes, loadAlertRules, loadOta])
+
+  // While an upgrade is in flight, poll its status so progress/state
+  // updates show up without the operator manually refreshing the page.
+  useEffect(() => {
+    if (!ota || ota.state === 'success' || ota.state === 'failed' || ota.state === 'rolled_back') return
+    const timer = setInterval(loadOta, 5000)
+    return () => clearInterval(timer)
+  }, [ota, loadOta])
+
+  const onDispatchOta = async () => {
+    if (!selectedFirmwareId) {
+      message.error('请选择固件')
+      return
+    }
+    setOtaSubmitting(true)
+    try {
+      await dispatchDeviceOta(deviceId, { firmware_id: selectedFirmwareId })
+      message.success('已下发升级指令')
+      loadOta()
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '下发失败')
+    } finally {
+      setOtaSubmitting(false)
+    }
+  }
+
+  const onCancelOta = async () => {
+    try {
+      await cancelDeviceOta(deviceId)
+      message.success('已请求取消升级')
+      loadOta()
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '取消失败')
+    }
+  }
 
   const onUpsertProbe = async (values: {
     pid: string
@@ -394,6 +460,52 @@ export default function DeviceDetailPage() {
                 },
               ]}
             />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={16} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <Card title="固件升级 (OTA)">
+            <Space wrap style={{ marginBottom: 16 }}>
+              <Select
+                style={{ width: 260 }}
+                placeholder="选择固件版本"
+                value={selectedFirmwareId}
+                onChange={setSelectedFirmwareId}
+                options={firmwareList
+                  .filter((f) => !device || f.pid === device.pid)
+                  .map((f) => ({ value: f.id, label: `${f.version}（${f.filename}）` }))}
+              />
+              <Button type="primary" icon={<CloudUploadOutlined />} loading={otaSubmitting} onClick={onDispatchOta}>
+                下发升级
+              </Button>
+              {ota && !['success', 'failed', 'rolled_back'].includes(ota.state) && (
+                <Button danger icon={<StopOutlined />} onClick={onCancelOta}>
+                  取消升级
+                </Button>
+              )}
+            </Space>
+            {ota ? (
+              <div>
+                <Space>
+                  <span>目标版本 {ota.version}</span>
+                  <Tag color={otaStateTag[ota.state].color}>{otaStateTag[ota.state].text}</Tag>
+                </Space>
+                {['downloading', 'flashing'].includes(ota.state) && (
+                  <Progress percent={ota.progress} style={{ maxWidth: 320, marginTop: 8 }} />
+                )}
+                {ota.last_error && (
+                  <div>
+                    <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                      {ota.last_error}
+                    </Typography.Text>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Typography.Text type="secondary">该设备暂无升级任务</Typography.Text>
+            )}
           </Card>
         </Col>
       </Row>

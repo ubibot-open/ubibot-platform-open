@@ -68,15 +68,25 @@ type Nak struct {
 	M  string `json:"m"`
 }
 
+// OtaStatus is the device's self-reported OTA progress (protocol §7.3),
+// piggybacked on a regular data report while an upgrade is in flight.
+type OtaStatus struct {
+	ID       string `json:"id"`
+	Version  string `json:"version"`
+	State    string `json:"state"`
+	Progress int    `json:"progress,omitempty"`
+}
+
 // ReportRequest is POST /api/v1/data/report. Recs supports batching
 // multiple time points (e.g. buffered offline data) in a single upload.
 // Ack/Nak confirm commands the device has already tried to execute (see
 // CmdItem) — a given command id appears in at most one of the two.
 type ReportRequest struct {
-	DID  string   `json:"did" binding:"required"`
-	Recs []Record `json:"recs" binding:"required"`
-	Ack  []string `json:"ack"`
-	Nak  []Nak    `json:"nak"`
+	DID  string     `json:"did" binding:"required"`
+	Recs []Record   `json:"recs" binding:"required"`
+	Ack  []string   `json:"ack"`
+	Nak  []Nak      `json:"nak"`
+	Ota  *OtaStatus `json:"ota"`
 }
 
 // Config is the device's sampling/upload configuration.

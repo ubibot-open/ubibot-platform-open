@@ -39,6 +39,7 @@ func NewRouter(s *Server) http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/activate", withRateLimit(s.RateLimiter, s.Activate))
 	mux.HandleFunc("POST /api/v1/data/report", withRateLimit(s.RateLimiter, s.Report))
 	mux.HandleFunc("GET /api/v1/device/poll", withRateLimit(s.RateLimiter, s.Poll))
+	mux.HandleFunc("GET /api/v1/ota/firmware", withRateLimit(s.RateLimiter, s.OtaFirmwareDownload))
 
 	mux.HandleFunc("POST /api/admin/login", s.AdminLogin)
 	mux.HandleFunc("GET /api/admin/me", s.RequireAdmin(s.AdminMe))
@@ -79,6 +80,51 @@ func NewRouter(s *Server) http.Handler {
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.RequirePermission(model.PermSystemManage, s.UpdateAdminUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteAdminUser))
 	mux.HandleFunc("GET /api/admin/audit-logs", s.RequirePermission(model.PermSystemManage, s.ListAuditLogs))
+
+	// OTA (protocol §7.3): firmware asset management rides on system:manage
+	// (a shared asset, not scoped to one device); per-device dispatch/
+	// cancel/status ride on the same permissions as command dispatch and
+	// device read.
+	mux.HandleFunc("GET /api/admin/firmware", s.RequirePermission(model.PermSystemManage, s.ListFirmware))
+	mux.HandleFunc("POST /api/admin/firmware", s.RequirePermission(model.PermSystemManage, s.UploadFirmware))
+	mux.HandleFunc("DELETE /api/admin/firmware/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteFirmware))
+	mux.HandleFunc("GET /api/admin/devices/{id}/ota", s.RequirePermission(model.PermDeviceRead, s.GetDeviceOTA))
+	mux.HandleFunc("POST /api/admin/devices/{id}/ota", s.RequirePermission(model.PermCommandWrite, s.DispatchDeviceOTA))
+	mux.HandleFunc("POST /api/admin/devices/{id}/ota/cancel", s.RequirePermission(model.PermCommandWrite, s.CancelDeviceOTA))
+
+	// 消息中心.
+	mux.HandleFunc("GET /api/admin/notifications", s.RequireAdmin(s.ListNotifications))
+	mux.HandleFunc("POST /api/admin/notifications/{id}/read", s.RequireAdmin(s.MarkNotificationRead))
+	mux.HandleFunc("POST /api/admin/notifications/read-all", s.RequireAdmin(s.MarkAllNotificationsRead))
+
+	// 定时任务.
+	mux.HandleFunc("GET /api/admin/scheduled-tasks", s.RequirePermission(model.PermCommandWrite, s.ListScheduledTasks))
+	mux.HandleFunc("POST /api/admin/scheduled-tasks", s.RequirePermission(model.PermCommandWrite, s.CreateScheduledTask))
+	mux.HandleFunc("PATCH /api/admin/scheduled-tasks/{id}", s.RequirePermission(model.PermCommandWrite, s.UpdateScheduledTask))
+	mux.HandleFunc("DELETE /api/admin/scheduled-tasks/{id}", s.RequirePermission(model.PermCommandWrite, s.DeleteScheduledTask))
+
+	// 开放API管理 + 只读对外接口.
+	mux.HandleFunc("GET /api/admin/api-keys", s.RequirePermission(model.PermSystemManage, s.ListApiKeys))
+	mux.HandleFunc("POST /api/admin/api-keys", s.RequirePermission(model.PermSystemManage, s.CreateApiKey))
+	mux.HandleFunc("POST /api/admin/api-keys/{id}/revoke", s.RequirePermission(model.PermSystemManage, s.RevokeApiKey))
+	mux.HandleFunc("GET /api/open/v1/devices", s.RequireApiKey(s.OpenListDevices))
+	mux.HandleFunc("GET /api/open/v1/devices/{id}/records", s.RequireApiKey(s.OpenGetDeviceRecords))
+
+	// 文件/字典/参数.
+	mux.HandleFunc("GET /api/admin/files", s.RequirePermission(model.PermSystemManage, s.ListFileAssets))
+	mux.HandleFunc("POST /api/admin/files", s.RequirePermission(model.PermSystemManage, s.UploadFileAsset))
+	mux.HandleFunc("DELETE /api/admin/files/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteFileAsset))
+	mux.HandleFunc("GET /api/admin/dict", s.RequireAdmin(s.ListDictEntries))
+	mux.HandleFunc("POST /api/admin/dict", s.RequirePermission(model.PermSystemManage, s.CreateDictEntry))
+	mux.HandleFunc("PATCH /api/admin/dict/{id}", s.RequirePermission(model.PermSystemManage, s.UpdateDictEntry))
+	mux.HandleFunc("DELETE /api/admin/dict/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteDictEntry))
+	mux.HandleFunc("GET /api/admin/params", s.RequirePermission(model.PermSystemManage, s.ListSystemParams))
+	mux.HandleFunc("PATCH /api/admin/params/{key}", s.RequirePermission(model.PermSystemManage, s.SetSystemParam))
+
+	// 系统监控 + 仪表盘.
+	mux.HandleFunc("GET /api/admin/system/metrics", s.RequirePermission(model.PermSystemManage, s.SystemMetrics))
+	mux.HandleFunc("GET /api/admin/dashboard/summary", s.RequireAdmin(s.DashboardSummary))
+	mux.HandleFunc("GET /api/admin/dashboard/trends", s.RequireAdmin(s.DashboardTrends))
 
 	return withCORS(mux)
 }

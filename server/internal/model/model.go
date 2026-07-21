@@ -272,3 +272,183 @@ type AuditLog struct {
 }
 
 func (AuditLog) TableName() string { return "audit_logs" }
+
+// Firmware is an uploaded OTA image (protocol §7.3) plus the integrity
+// metadata devices need to safely apply it. The binary itself lives on
+// disk (Path) — sqlite is fine for metadata, not for multi-MB blobs.
+type Firmware struct {
+	ID        uint   `gorm:"primaryKey"`
+	PID       string `gorm:"size:64;not null;index"` // which product this firmware targets
+	Version   string `gorm:"size:32;not null"`
+	Filename  string `gorm:"size:255;not null"`
+	Path      string `gorm:"size:255;not null"`
+	Size      int64  `gorm:"not null"`
+	SHA256    string `gorm:"size:64;not null"`
+	Signature string `gorm:"size:512"` // optional, protocol §7.3 a.sig
+
+	CreatedAt time.Time
+}
+
+func (Firmware) TableName() string { return "firmwares" }
+
+// OTA task states (protocol §7.3's ota.state). Pending is this server's
+// own bookkeeping value for "dispatched, no progress reported yet" — it
+// never appears on the wire, the device only ever reports the states
+// from downloading onward.
+const (
+	OtaStatePending     = "pending"
+	OtaStateDownloading = "downloading"
+	OtaStateVerifying   = "verifying"
+	OtaStateFlashing    = "flashing"
+	OtaStateRebooting   = "rebooting"
+	OtaStateSuccess     = "success"
+	OtaStateFailed      = "failed"
+	OtaStateRolledBack  = "rolled_back"
+)
+
+// DeviceOTA tracks the single in-flight (or most recently finished) OTA
+// task for a device — one row per device, overwritten by each new
+// dispatch, since only one upgrade is ever in flight at a time.
+type DeviceOTA struct {
+	ID         uint   `gorm:"primaryKey"`
+	DeviceID   uint   `gorm:"not null;uniqueIndex"`
+	FirmwareID uint   `gorm:"not null"`
+	CmdID      string `gorm:"size:24;not null"`
+	Version    string `gorm:"size:32;not null"`
+	State      string `gorm:"size:16;not null"`
+	Progress   int
+	LastError  string `gorm:"size:255"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (DeviceOTA) TableName() string { return "device_otas" }
+
+// Notification levels/statuses/types (消息中心) — distinct from AlertEvent
+// (device-condition specific, shown in 告警中心): a Notification also
+// covers things like OTA outcomes and other system-level events.
+const (
+	NotificationLevelInfo     = "info"
+	NotificationLevelWarning  = "warning"
+	NotificationLevelCritical = "critical"
+
+	NotificationStatusUnread = "unread"
+	NotificationStatusRead   = "read"
+
+	NotificationTypeAlert  = "alert"
+	NotificationTypeOta    = "ota"
+	NotificationTypeSystem = "system"
+)
+
+// Notification is a system-generated message surfaced in the admin
+// header bell.
+type Notification struct {
+	ID      uint   `gorm:"primaryKey"`
+	Type    string `gorm:"size:32;not null"`
+	Level   string `gorm:"size:16;not null;default:info"`
+	Title   string `gorm:"size:128;not null"`
+	Content string `gorm:"type:text"`
+	Status  string `gorm:"size:16;not null;default:unread;index"`
+
+	CreatedAt time.Time
+}
+
+func (Notification) TableName() string { return "notifications" }
+
+// Scheduled-task schedule kinds — kept to these two common cases instead
+// of a full cron expression parser (which would also mean a new module
+// dependency this sandbox's restricted network can't necessarily fetch).
+const (
+	ScheduleTypeInterval = "interval"
+	ScheduleTypeDaily    = "daily"
+)
+
+// ScheduledTask periodically (or once, if disabled after the first run is
+// desired) queues a command for a device — e.g. a nightly reboot — without
+// an operator manually dispatching it each time. DeviceID 0 means "every
+// enabled device".
+type ScheduledTask struct {
+	ID       uint   `gorm:"primaryKey"`
+	Name     string `gorm:"size:128;not null"`
+	DeviceID uint   `gorm:"index"`
+	CmdType  string `gorm:"size:24;not null"`
+	CmdArgs  string `gorm:"type:text"`
+
+	ScheduleType    string `gorm:"size:16;not null"`
+	IntervalSeconds int
+	DailyAtMinute   int // minutes since local midnight, for daily schedules
+
+	Enabled   bool `gorm:"not null;default:true"`
+	NextRunAt time.Time
+	LastRunAt *time.Time
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (ScheduledTask) TableName() string { return "scheduled_tasks" }
+
+// ApiKey authenticates third-party integrations against the read-only
+// /api/open/v1 surface (see internal/api's RequireApiKey) — a separate
+// credential from admin sessions and device tokens, scoped narrower than
+// either. Only KeyHash is persisted; the raw key is shown once at
+// creation, the same pattern as a device secret.
+type ApiKey struct {
+	ID         uint   `gorm:"primaryKey"`
+	Name       string `gorm:"size:128;not null"`
+	KeyHash    string `gorm:"size:128;not null;uniqueIndex"`
+	Prefix     string `gorm:"size:12;not null"` // shown in the UI so operators can tell keys apart without re-revealing them
+	Revoked    bool   `gorm:"not null;default:false"`
+	LastUsedAt *time.Time
+
+	CreatedAt time.Time
+}
+
+func (ApiKey) TableName() string { return "api_keys" }
+
+// FileAsset is a generic uploaded-file record (exports, attachments,
+// etc.) — separate from Firmware, which has its own OTA-specific
+// integrity columns and lifecycle.
+type FileAsset struct {
+	ID       uint   `gorm:"primaryKey"`
+	Category string `gorm:"size:32;not null;index"`
+	Filename string `gorm:"size:255;not null"`
+	Path     string `gorm:"size:255;not null"`
+	Size     int64  `gorm:"not null"`
+	SHA256   string `gorm:"size:64"`
+
+	CreatedAt time.Time
+}
+
+func (FileAsset) TableName() string { return "file_assets" }
+
+// DictEntry is a small key/value enumeration operators can edit without a
+// deploy — e.g. display labels for command types. Type groups entries
+// into a named dictionary (e.g. "command_type"); Key is the stored value,
+// Label is what the UI shows for it.
+type DictEntry struct {
+	ID    uint   `gorm:"primaryKey"`
+	Type  string `gorm:"size:64;not null;index"`
+	Key   string `gorm:"size:64;not null"`
+	Label string `gorm:"size:128;not null"`
+	Sort  int
+
+	CreatedAt time.Time
+}
+
+func (DictEntry) TableName() string { return "dict_entries" }
+
+// SystemParam is a small whitelist of runtime-tunable settings. Not every
+// key changes behavior — see internal/api/param_handlers.go and main.go
+// for which ones are actually read back into live server state versus
+// purely informational.
+type SystemParam struct {
+	Key         string `gorm:"primaryKey;size:64"`
+	Value       string `gorm:"size:255;not null"`
+	Description string `gorm:"size:255"`
+
+	UpdatedAt time.Time
+}
+
+func (SystemParam) TableName() string { return "system_params" }

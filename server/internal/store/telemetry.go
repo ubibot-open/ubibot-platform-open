@@ -81,3 +81,30 @@ func (s *Store) QueryRecords(deviceID uint, start, end int64, page, pageSize int
 	}
 	return rows, total, nil
 }
+
+// CountRecordsSince returns how many telemetry rows have ts >= since —
+// used by the dashboard summary for "今日上报条数".
+func (s *Store) CountRecordsSince(since int64) (int64, error) {
+	var n int64
+	err := s.db.Model(&model.DeviceRecord{}).Where("ts >= ?", since).Count(&n).Error
+	return n, err
+}
+
+// DailyRecordCount is one bucket of RecordCountsByDay's result.
+type DailyRecordCount struct {
+	Day   string `json:"day"`
+	Count int64  `json:"count"`
+}
+
+// RecordCountsByDay buckets telemetry rows by calendar day (UTC) for
+// ts >= since — the dashboard trend chart's backing query.
+func (s *Store) RecordCountsByDay(since int64) ([]DailyRecordCount, error) {
+	var rows []DailyRecordCount
+	err := s.db.Model(&model.DeviceRecord{}).
+		Select("date(ts, 'unixepoch') as day, count(*) as count").
+		Where("ts >= ?", since).
+		Group("day").
+		Order("day asc").
+		Scan(&rows).Error
+	return rows, err
+}

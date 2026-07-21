@@ -47,6 +47,15 @@ func (l *IPLimiter) Allow(key string, now time.Time) bool {
 	return l.counts[key] <= l.limit
 }
 
+// SetLimit changes the per-window request budget at runtime — used when
+// the "rate_limit_per_minute" system parameter is updated (see
+// param_handlers.go) so a limit change takes effect without a restart.
+func (l *IPLimiter) SetLimit(limit int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.limit = limit
+}
+
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

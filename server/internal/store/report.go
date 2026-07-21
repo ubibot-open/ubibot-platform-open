@@ -20,11 +20,14 @@ type ReportOutcome struct {
 // command queue, mark the device as just-seen, and work out what to hand
 // back — the config only if it changed since it was last delivered, plus
 // whatever commands are still pending.
-func (s *Store) ProcessReport(dev *model.Device, recs []protocol.Record, ack []string, nak []protocol.Nak, now time.Time) (ReportOutcome, error) {
+func (s *Store) ProcessReport(dev *model.Device, recs []protocol.Record, ack []string, nak []protocol.Nak, ota *protocol.OtaStatus, now time.Time) (ReportOutcome, error) {
 	if err := s.SaveRecords(dev.ID, recs); err != nil {
 		return ReportOutcome{}, err
 	}
 	if err := s.applyAckNak(dev.ID, ack, nak); err != nil {
+		return ReportOutcome{}, err
+	}
+	if err := s.applyOtaStatus(dev.ID, ota); err != nil {
 		return ReportOutcome{}, err
 	}
 	if err := s.TouchLastSeen(dev.ID, now); err != nil {
@@ -83,15 +86,25 @@ func (s *Store) applyAckNak(deviceID uint, ack []string, nak []protocol.Nak) err
 	}
 
 	for _, id := range ack {
-		if types[id] == "set_probe" {
+		switch types[id] {
+		case "set_probe":
 			if err := s.applyProbeCommandOutcome(deviceID, id, true, ""); err != nil {
+				return err
+			}
+		case "ota":
+			if err := s.applyOtaCommandOutcome(deviceID, id, true, ""); err != nil {
 				return err
 			}
 		}
 	}
 	for _, id := range nakIDs {
-		if types[id] == "set_probe" {
+		switch types[id] {
+		case "set_probe":
 			if err := s.applyProbeCommandOutcome(deviceID, id, false, nakMsg[id]); err != nil {
+				return err
+			}
+		case "ota":
+			if err := s.applyOtaCommandOutcome(deviceID, id, false, nakMsg[id]); err != nil {
 				return err
 			}
 		}

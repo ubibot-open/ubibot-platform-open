@@ -43,6 +43,16 @@ func main() {
 	}
 
 	srv := api.NewServer(st)
+	srv.DBPath = dbPath
+	dataDir := filepath.Dir(dbPath)
+	srv.FirmwareDir = filepath.Join(dataDir, "firmware")
+	srv.FileDir = filepath.Join(dataDir, "files")
+
+	if err := seedDefaultParams(st); err != nil {
+		log.Fatalf("seed default params: %v", err)
+	}
+	applyStoredParams(srv, st)
+
 	r := api.NewRouter(srv)
 
 	// Offline-alert detection is the absence of a report, so nothing about
@@ -50,6 +60,10 @@ func main() {
 	// notice. Runs independently of request traffic for the life of the
 	// process.
 	go runOfflineSweepLoop(st, 30*time.Second)
+
+	// Scheduled command dispatch (定时任务) — checked more often than the
+	// offline sweep since interval-based tasks can be as short as a minute.
+	go runScheduledTaskLoop(st, 15*time.Second)
 
 	addr := os.Getenv("UBIBOT_LISTEN_ADDR")
 	if addr == "" {
@@ -69,6 +83,54 @@ func runOfflineSweepLoop(st *store.Store, interval time.Duration) {
 		if err := st.OfflineSweep(time.Now()); err != nil {
 			log.Printf("offline sweep error: %v", err)
 		}
+	}
+}
+
+func runScheduledTaskLoop(st *store.Store, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := st.RunDueScheduledTasks(time.Now()); err != nil {
+			log.Printf("scheduled task run error: %v", err)
+		}
+	}
+}
+
+// seedDefaultParams writes the whitelist of runtime-tunable system
+// parameters (see internal/store/param.go, internal/api/param_handlers.go)
+// on first run only — an admin who has already customized a value should
+// never have it silently reset back to default by a restart.
+func seedDefaultParams(st *store.Store) error {
+	defaults := map[string]struct {
+		value string
+		desc  string
+	}{
+		store.ParamRateLimitPerMinute: {"120", "设备侧接口每IP每分钟请求上限"},
+		store.ParamOfflineGraceMinute: {"2", "离线判定的最小宽限时间（分钟）"},
+	}
+	for key, d := range defaults {
+		if _, ok := st.GetParam(key); ok {
+			continue
+		}
+		if _, err := st.SetParam(key, d.value, d.desc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applyStoredParams pushes every persisted system parameter into live
+// server state at startup — the DB is the source of truth, this just
+// catches it up after a restart (see Server.ApplyParam for which keys
+// actually do anything).
+func applyStoredParams(srv *api.Server, st *store.Store) {
+	params, err := st.ListParams()
+	if err != nil {
+		log.Printf("load system params: %v", err)
+		return
+	}
+	for _, p := range params {
+		srv.ApplyParam(p.Key, p.Value)
 	}
 }
 

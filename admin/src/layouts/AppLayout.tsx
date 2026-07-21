@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Breadcrumb, Button, Badge, Dropdown, Avatar, List, Popover, Typography } from 'antd'
 import type { MenuProps } from 'antd'
@@ -17,6 +17,7 @@ import {
 import { menuTree, type MenuNode } from '../router/menu'
 import { useThemeMode } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import { listNotifications, markAllNotificationsRead, markNotificationRead, type Notification } from '../api/notification'
 
 const { Header, Sider, Content } = Layout
 
@@ -40,18 +41,46 @@ function findTrail(pathname: string): MenuNode[] {
   return []
 }
 
-const mockNotifications = [
-  { id: 1, text: 'sn_ws1_20034 温度超限 38.2℃', time: '2分钟前' },
-  { id: 2, text: 'sn_ws1_20011 探头配置下发失败', time: '18分钟前' },
-  { id: 3, text: 'sn_ws1_19987 超过30分钟未上报', time: '1小时前' },
-]
-
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { mode, toggle } = useThemeMode()
   const { username, logout } = useAuth()
+
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unread, setUnread] = useState(0)
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await listNotifications(1, 10)
+      setNotifications(res.list)
+      setUnread(res.unread)
+    } catch {
+      // The bell is a nice-to-have — a failed fetch shouldn't disrupt the rest of the layout.
+    }
+  }, [])
+
+  useEffect(() => {
+    loadNotifications()
+    const timer = setInterval(loadNotifications, 30000)
+    return () => clearInterval(timer)
+  }, [loadNotifications])
+
+  const onOpenNotifications = (open: boolean) => {
+    if (open && unread > 0) {
+      markAllNotificationsRead()
+        .then(() => {
+          setUnread(0)
+          setNotifications((prev) => prev.map((n) => ({ ...n, status: 'read' })))
+        })
+        .catch(() => undefined)
+    }
+  }
+
+  const onClickNotification = (id: number) => {
+    markNotificationRead(id).catch(() => undefined)
+  }
 
   const trail = useMemo(() => findTrail(location.pathname), [location.pathname])
   const selectedKeys = trail.length ? [trail[trail.length - 1].key] : []
@@ -131,17 +160,20 @@ export default function AppLayout() {
           <Popover
             placement="bottomRight"
             trigger="click"
+            onOpenChange={onOpenNotifications}
             content={
               <List
-                style={{ width: 280 }}
+                style={{ width: 300, maxHeight: 360, overflowY: 'auto' }}
                 size="small"
-                dataSource={mockNotifications}
+                locale={{ emptyText: '暂无通知' }}
+                dataSource={notifications}
                 renderItem={(item) => (
-                  <List.Item>
+                  <List.Item onClick={() => onClickNotification(item.id)} style={{ cursor: 'pointer' }}>
                     <div>
-                      <div>{item.text}</div>
+                      <div style={{ fontWeight: item.status === 'unread' ? 600 : 400 }}>{item.title}</div>
+                      <div style={{ fontSize: 12 }}>{item.content}</div>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {item.time}
+                        {new Date(item.created_at * 1000).toLocaleString()}
                       </Typography.Text>
                     </div>
                   </List.Item>
@@ -149,7 +181,15 @@ export default function AppLayout() {
               />
             }
           >
-            <Button type="text" icon={<Badge dot offset={[-2, 2]}><BellOutlined /></Badge>} aria-label="通知" />
+            <Button
+              type="text"
+              icon={
+                <Badge count={unread} size="small" offset={[-2, 2]}>
+                  <BellOutlined />
+                </Badge>
+              }
+              aria-label="通知"
+            />
           </Popover>
           <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={['click']}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, cursor: 'pointer' }}>

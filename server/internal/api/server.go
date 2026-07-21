@@ -20,12 +20,20 @@ type Server struct {
 	Nonces      *auth.NonceStore
 	RateLimiter *IPLimiter
 	Now         func() time.Time
+
+	// FirmwareDir is where uploaded OTA images (protocol §7.3) are stored
+	// on disk; DBPath and StartedAt back the 系统监控 metrics endpoint.
+	FirmwareDir string
+	FileDir     string
+	DBPath      string
+	StartedAt   time.Time
 }
 
 // DefaultRateLimitPerMinute is how many device-facing requests a single
 // IP may make per minute before getting 429/1900 — generous enough for a
 // device reporting every few seconds plus retries, tight enough to blunt
-// a runaway loop or someone scripting against the endpoint.
+// a runaway loop or someone scripting against the endpoint. Overridable
+// at runtime via the "rate_limit_per_minute" system parameter.
 const DefaultRateLimitPerMinute = 120
 
 func NewServer(st *store.Store) *Server {
@@ -34,5 +42,6 @@ func NewServer(st *store.Store) *Server {
 		Nonces:      auth.NewNonceStore(),
 		RateLimiter: NewIPLimiter(DefaultRateLimitPerMinute, time.Minute),
 		Now:         time.Now,
+		StartedAt:   time.Now(),
 	}
 }

@@ -155,17 +155,19 @@ func (s *Store) evaluateThresholdRules(deviceID uint, recs []protocol.Record) er
 
 		switch {
 		case violating && !hasOpen:
+			msg := fmt.Sprintf("%s %s %g（当前值 %g）", rule.Field, rule.Op, rule.Threshold, value)
 			ev := &model.AlertEvent{
 				DeviceID:    deviceID,
 				RuleID:      rule.ID,
 				Type:        model.AlertTypeThreshold,
-				Message:     fmt.Sprintf("%s %s %g（当前值 %g）", rule.Field, rule.Op, rule.Threshold, value),
+				Message:     msg,
 				Status:      model.AlertStatusOpen,
 				TriggeredAt: time.Now(),
 			}
 			if err := s.db.Create(ev).Error; err != nil {
 				return err
 			}
+			s.notifyAlertOpened(deviceID, msg)
 		case !violating && hasOpen:
 			now := time.Now()
 			if err := s.db.Model(existing).Updates(map[string]any{
@@ -176,6 +178,21 @@ func (s *Store) evaluateThresholdRules(deviceID uint, recs []protocol.Record) er
 		}
 	}
 	return nil
+}
+
+// notifyAlertOpened surfaces a newly-opened alert in the 消息中心 bell —
+// best-effort (errors are swallowed) since a notification-write failure
+// shouldn't block the alert itself from having been recorded.
+func (s *Store) notifyAlertOpened(deviceID uint, message string) {
+	name := "设备"
+	if dev, err := s.DeviceByID(deviceID); err == nil {
+		if dev.Name != "" {
+			name = dev.Name
+		} else {
+			name = dev.SN
+		}
+	}
+	_ = s.CreateNotification(model.NotificationTypeAlert, model.NotificationLevelWarning, "新告警", name+"："+message)
 }
 
 func toFloat(v any) (float64, bool) {
@@ -219,6 +236,7 @@ func (s *Store) OfflineSweep(now time.Time) error {
 			if err := s.db.Create(ev).Error; err != nil {
 				return err
 			}
+			s.notifyAlertOpened(dev.ID, ev.Message)
 		case !offline && hasOpen:
 			if err := s.db.Model(&existing).Updates(map[string]any{
 				"status": model.AlertStatusResolved, "resolved_at": now,
