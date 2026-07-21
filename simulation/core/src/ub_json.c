@@ -150,6 +150,15 @@ int ub_json_get_int64(const char *val, int64_t *out) {
     return 0;
 }
 
+int ub_json_get_double(const char *val, double *out) {
+    val = skip_ws(val);
+    char *end = NULL;
+    double v = strtod(val, &end);
+    if (end == val) return -1;
+    *out = v;
+    return 0;
+}
+
 int ub_json_get_bool(const char *val, int *out) {
     val = skip_ws(val);
     if (strncmp(val, "true", 4) == 0) {

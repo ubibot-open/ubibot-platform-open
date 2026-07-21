@@ -29,6 +29,7 @@ const char *ub_json_find_key(const char *obj, const char *key);
  * mismatch or truncation. */
 int ub_json_get_string(const char *val, char *out, size_t out_cap);
 int ub_json_get_int64(const char *val, int64_t *out);
+int ub_json_get_double(const char *val, double *out);
 int ub_json_get_bool(const char *val, int *out);
 
 /* True if val points at a JSON object ('{') / array ('[') / null. */

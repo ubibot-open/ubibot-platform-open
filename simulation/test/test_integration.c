@@ -1,10 +1,8 @@
 /* Integration test: drives the C client codec over a real TCP connection
- * against a *running* instance of cmd/server (see csrc/Makefile's
- * `integration-test` target, which starts and stops the Go server around
- * this binary). Exercises the full device lifecycle: time sync -> activate
- * (nonce path) -> report -> re-activate (local-clock path) -> a couple of
- * error paths -- the things a real device does that a pure unit test
- * can't reach without a socket.
+ * against a *running* instance of cmd/server. Exercises the full device
+ * lifecycle: time sync -> activate (nonce path) -> report -> re-activate
+ * (local-clock path) -> a couple of error paths -- the things a real
+ * device does that a pure unit test can't reach without a socket.
  *
  * Usage: test_integration [host] [port]
  */
@@ -14,7 +12,7 @@
 
 #include "ub_protocol.h"
 #include "ub_test.h"
-#include "ub_transport_posix.h"
+#include "ub_transport_sockets.h"
 
 /* Must match the demo device seeded in cmd/server/main.go. */
 #define PID "ubibot_open_dev_v1"
@@ -157,7 +155,7 @@ static void test_malformed_body_rejected(void) {
 int main(int argc, char **argv) {
     g_host = argc > 1 ? argv[1] : "127.0.0.1";
     g_port = argc > 2 ? atoi(argv[2]) : 8080;
-    ub_posix_transport_init(&g_tr);
+    ub_sockets_transport_init(&g_tr);
 
     fprintf(stderr, "running integration tests against %s:%d\n", g_host, g_port);
 

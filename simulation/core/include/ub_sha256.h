@@ -1,6 +1,11 @@
 /* Compact, dependency-free SHA-256 (FIPS 180-4). Streaming API only, no
  * heap allocation, so a caller on a memory-constrained MCU can put the
- * context on the stack (~110 bytes) and feed data incrementally. */
+ * context on the stack (~110 bytes) and feed data incrementally.
+ *
+ * Portability: pure C11, only <stddef.h>/<stdint.h>. No OS, no libc beyond
+ * memcpy/memset (pulled in by the .c file) — safe to compile unmodified
+ * against any embedded libc (newlib, picolibc, etc.) for a real FreeRTOS
+ * target. */
 #ifndef UB_SHA256_H
 #define UB_SHA256_H
 
