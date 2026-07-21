@@ -105,13 +105,138 @@ type DeviceCommand struct {
 
 func (DeviceCommand) TableName() string { return "device_commands" }
 
+// Probe lifecycle: Pending until the set_probe command that (up)serted or
+// removed it is acked/nacked (see store.applyProbeCommandOutcome).
+const (
+	ProbeStatusPending  = "pending"
+	ProbeStatusApplied  = "applied"
+	ProbeStatusFailed   = "failed"
+	ProbeStatusRemoving = "removing"
+)
+
+// DeviceProbe is a custom sensor read configuration (protocol §7.2
+// set_probe) — RS485/Modbus register maps, analog scaling, etc. that can't
+// be baked into firmware because they vary by whatever's physically wired
+// to the device. Params holds the protocol-specific fields (addr/fc/reg/
+// cnt/dtype/byte_order/scale/offset/ci/timeout/retry) as a JSON blob
+// rather than one column each — the field set differs by iface/proto, and
+// exploding every combination into sparse columns wouldn't read any
+// clearer than the JSON the wire protocol already uses.
+type DeviceProbe struct {
+	ID       uint   `gorm:"primaryKey"`
+	DeviceID uint   `gorm:"not null;uniqueIndex:idx_device_pid"`
+	Pid      string `gorm:"size:32;not null;uniqueIndex:idx_device_pid"`
+	Key      string `gorm:"size:64;not null"`
+	Iface    string `gorm:"size:32;not null"`
+	Proto    string `gorm:"size:32;not null"`
+	Params   string `gorm:"type:text"`
+
+	Status        string `gorm:"size:16;not null;default:pending"`
+	LastCommandID string `gorm:"size:24"`
+	LastError     string `gorm:"size:255"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (DeviceProbe) TableName() string { return "device_probes" }
+
+// Alert types and statuses.
+const (
+	AlertTypeThreshold = "threshold"
+	AlertTypeOffline   = "offline"
+
+	AlertStatusOpen     = "open"
+	AlertStatusResolved = "resolved"
+)
+
+// Comparison operators an AlertRule can use against a telemetry field.
+const (
+	AlertOpGT = ">"
+	AlertOpGE = ">="
+	AlertOpLT = "<"
+	AlertOpLE = "<="
+	AlertOpEQ = "=="
+)
+
+// AlertRule is a per-device threshold check, evaluated against every
+// newly-saved telemetry record (see store.evaluateThresholdRules). Offline
+// detection has no rule row — it's a structural check against
+// Device.LastSeenAt run by the background sweep in cmd/server, not a
+// user-configured condition.
+type AlertRule struct {
+	ID        uint    `gorm:"primaryKey"`
+	DeviceID  uint    `gorm:"not null;index"`
+	Field     string  `gorm:"size:64;not null"`
+	Op        string  `gorm:"size:4;not null"`
+	Threshold float64 `gorm:"not null"`
+	Enabled   bool    `gorm:"not null;default:true"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (AlertRule) TableName() string { return "alert_rules" }
+
+// AlertEvent is one open-or-resolved occurrence of a rule firing (or a
+// device going offline). RuleID is 0 for offline events. Re-triggering an
+// already-open event for the same rule/device is a no-op (see
+// store.evaluateThresholdRules) so a flapping sensor doesn't spam the
+// alert center with duplicate open rows.
+type AlertEvent struct {
+	ID       uint   `gorm:"primaryKey"`
+	DeviceID uint   `gorm:"not null;index"`
+	RuleID   uint   `gorm:"index"`
+	Type     string `gorm:"size:16;not null"`
+	Message  string `gorm:"size:255;not null"`
+	Status   string `gorm:"size:16;not null;default:open;index"`
+
+	TriggeredAt time.Time
+	ResolvedAt  *time.Time
+}
+
+func (AlertEvent) TableName() string { return "alert_events" }
+
+// Built-in role codes. RoleSuper is seeded once at bootstrap (see
+// cmd/server/main.go) and always passes permission checks regardless of
+// its stored Permissions — a fixed escape hatch so a botched permissions
+// edit can never lock every admin out.
+const RoleSuper = "super_admin"
+
+// Permission codes checked by internal/api's RequirePermission. Keeping
+// this as a flat list of strings (stored space-separated on Role, see
+// Permissions) instead of a normalized join table is a deliberate P1
+// simplification — revisit if the permission set outgrows "one row per
+// role, one column of codes".
+const (
+	PermDeviceRead     = "device:read"
+	PermDeviceWrite    = "device:write"
+	PermCommandWrite   = "command:write"
+	PermAlertManage    = "alert:manage"
+	PermSystemManage   = "system:manage"
+)
+
+// Role groups a set of permission codes under a name an AdminUser can be
+// assigned to.
+type Role struct {
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"size:64;not null"`
+	Code        string `gorm:"size:64;not null;uniqueIndex"`
+	Permissions string `gorm:"type:text"` // space-separated permission codes, or "*" for all
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (Role) TableName() string { return "roles" }
+
 // AdminUser is a back-office operator account. There is no separate
-// customer/tenant account type yet — out of scope for the P0 slice this
-// package implements.
+// customer/tenant account type yet — out of scope for this slice.
 type AdminUser struct {
 	ID           uint   `gorm:"primaryKey"`
 	Username     string `gorm:"size:64;not null;uniqueIndex"`
 	PasswordHash string `gorm:"size:128;not null"`
+	RoleID       uint   `gorm:"not null;index"`
 
 	CreatedAt time.Time
 }
@@ -129,3 +254,21 @@ type AdminSession struct {
 }
 
 func (AdminSession) TableName() string { return "admin_sessions" }
+
+// AuditLog records a mutating admin action for after-the-fact review.
+// Written by internal/api's writeAudit helper at the point each mutating
+// handler succeeds — read-only endpoints (list/get) are not audited.
+type AuditLog struct {
+	ID         uint   `gorm:"primaryKey"`
+	AdminID    uint   `gorm:"not null;index"`
+	Username   string `gorm:"size:64;not null"`
+	Action     string `gorm:"size:64;not null"`
+	TargetType string `gorm:"size:32"`
+	TargetID   uint
+	Detail     string `gorm:"type:text"`
+	IP         string `gorm:"size:64"`
+
+	CreatedAt time.Time
+}
+
+func (AuditLog) TableName() string { return "audit_logs" }

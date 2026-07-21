@@ -162,7 +162,7 @@ func (s *Server) Report(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	outcome, err := s.Store.ProcessReport(dev, req.Recs, req.Ack, req.Nak)
+	outcome, err := s.Store.ProcessReport(dev, req.Recs, req.Ack, req.Nak, s.Now())
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, protocol.CodeDeviceNotFound, "device not found")
 		return
@@ -211,7 +211,7 @@ func (s *Server) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	outcome, err := s.Store.ProcessReport(dev, nil, nil, nil)
+	outcome, err := s.Store.ProcessReport(dev, nil, nil, nil, s.Now())
 	if err != nil {
 		writeErr(w, protocol.CodeServerError, "internal error")
 		return

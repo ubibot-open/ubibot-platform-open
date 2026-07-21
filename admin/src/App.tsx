@@ -11,7 +11,9 @@ import DeviceDetailPage from './pages/Device/Detail'
 import MonitorPage from './pages/Monitor'
 import CommandPage from './pages/Command'
 import AlertPage from './pages/Alert'
-import SystemPage from './pages/System'
+import AdminUserPage from './pages/System/Admin'
+import RolePage from './pages/System/Role'
+import AuditLogPage from './pages/System/Log'
 
 export default function App() {
   const { mode } = useThemeMode()
@@ -41,9 +43,9 @@ export default function App() {
               <Route path="/monitor" element={<MonitorPage />} />
               <Route path="/command" element={<CommandPage />} />
               <Route path="/alert" element={<AlertPage />} />
-              <Route path="/system/admin" element={<SystemPage />} />
-              <Route path="/system/role" element={<SystemPage />} />
-              <Route path="/system/log" element={<SystemPage />} />
+              <Route path="/system/admin" element={<AdminUserPage />} />
+              <Route path="/system/role" element={<RolePage />} />
+              <Route path="/system/log" element={<AuditLogPage />} />
               <Route path="/system" element={<Navigate to="/system/admin" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

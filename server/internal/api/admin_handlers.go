@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/ubibot/ubibot-platform-open/internal/auth"
 	"github.com/ubibot/ubibot-platform-open/internal/model"
@@ -33,6 +34,7 @@ type deviceDTO struct {
 	SN         string   `json:"sn"`
 	Name       string   `json:"name"`
 	Status     int      `json:"status"`
+	Online     bool     `json:"online"`
 	CI         int      `json:"ci"`
 	UI         int      `json:"ui"`
 	FE         []string `json:"fe"`
@@ -41,7 +43,12 @@ type deviceDTO struct {
 	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice
 }
 
-func toDeviceDTO(d *model.Device) deviceDTO {
+// toDeviceDTO's Online field uses the same rule (store.IsDeviceOnline) the
+// offline-alert sweep does, so the device list/detail view and the alert
+// center never disagree about which devices are up. now is the caller's
+// s.Now() rather than time.Now() directly so this stays testable against
+// a mocked clock, same as the rest of the device-facing time logic.
+func toDeviceDTO(d *model.Device, now time.Time) deviceDTO {
 	var fe []string
 	if d.FE != "" {
 		_ = json.Unmarshal([]byte(d.FE), &fe)
@@ -52,6 +59,7 @@ func toDeviceDTO(d *model.Device) deviceDTO {
 		SN:        d.SN,
 		Name:      d.Name,
 		Status:    d.Status,
+		Online:    store.IsDeviceOnline(d, now),
 		CI:        d.CI,
 		UI:        d.UI,
 		FE:        fe,
@@ -155,7 +163,7 @@ func (s *Server) ListDevices(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]deviceDTO, 0, len(devices))
 	for i := range devices {
-		list = append(list, toDeviceDTO(&devices[i]))
+		list = append(list, toDeviceDTO(&devices[i], s.Now()))
 	}
 	writeJSON(w, 200, map[string]any{"list": list, "total": total})
 }
@@ -193,7 +201,9 @@ func (s *Server) CreateDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dto := toDeviceDTO(dev)
+	s.audit(r, "device.create", "device", dev.ID, dev.SN)
+
+	dto := toDeviceDTO(dev, s.Now())
 	dto.Secret = secret
 	writeJSON(w, 200, dto)
 }
@@ -241,7 +251,7 @@ func (s *Server) GetDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, 200, map[string]any{
-		"device":   toDeviceDTO(dev),
+		"device":   toDeviceDTO(dev, s.Now()),
 		"records":  recordDTOs,
 		"commands": commandDTOs,
 	})
@@ -274,6 +284,7 @@ func (s *Server) UpdateDeviceConfig(w http.ResponseWriter, r *http.Request) {
 		adminErr(w, 500, "internal error")
 		return
 	}
+	s.audit(r, "device.update_config", "device", uint(id), "")
 	writeJSON(w, 200, map[string]any{"message": "ok"})
 }
 
@@ -303,6 +314,7 @@ func (s *Server) SetDeviceStatus(w http.ResponseWriter, r *http.Request) {
 		adminErr(w, 500, "internal error")
 		return
 	}
+	s.audit(r, "device.set_status", "device", uint(id), strconv.Itoa(req.Status))
 	writeJSON(w, 200, map[string]any{"message": "ok"})
 }
 
@@ -339,6 +351,7 @@ func (s *Server) DispatchCommand(w http.ResponseWriter, r *http.Request) {
 		adminErr(w, 500, "internal error")
 		return
 	}
+	s.audit(r, "command.dispatch", "device", uint(id), req.Type)
 	writeJSON(w, 200, toCommandDTO(cmd))
 }
 
@@ -359,6 +372,75 @@ func (s *Server) ListCommands(w http.ResponseWriter, r *http.Request) {
 	list := make([]commandDTO, 0, len(commands))
 	for i := range commands {
 		list = append(list, toCommandDTO(&commands[i]))
+	}
+	writeJSON(w, 200, map[string]any{"list": list, "total": total})
+}
+
+// GetDeviceRecords handles GET /api/admin/devices/{id}/records?start=&end=
+// — the "历史数据查询" page's backing endpoint. start/end are Unix
+// seconds; omit either to leave that bound open.
+func (s *Server) GetDeviceRecords(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		adminErr(w, 400, "invalid id")
+		return
+	}
+	start, _ := strconv.ParseInt(r.URL.Query().Get("start"), 10, 64)
+	end, _ := strconv.ParseInt(r.URL.Query().Get("end"), 10, 64)
+	page, pageSize := paginationParams(r)
+
+	records, total, err := s.Store.QueryRecords(uint(id), start, end, page, pageSize)
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+	list := make([]recordDTO, 0, len(records))
+	for _, rec := range records {
+		var d map[string]any
+		_ = json.Unmarshal([]byte(rec.Data), &d)
+		list = append(list, recordDTO{Ts: rec.Ts, D: d})
+	}
+	writeJSON(w, 200, map[string]any{"list": list, "total": total})
+}
+
+// ListAllCommands handles GET /api/admin/commands — cross-device command
+// history for the "指令管理" page, filterable by device_id/status/type.
+// (ListCommands above is the same data scoped to one device's detail
+// view.)
+func (s *Server) ListAllCommands(w http.ResponseWriter, r *http.Request) {
+	page, pageSize := paginationParams(r)
+	deviceID, _ := strconv.Atoi(r.URL.Query().Get("device_id"))
+
+	f := store.CommandFilter{
+		DeviceID: uint(deviceID),
+		Status:   r.URL.Query().Get("status"),
+		Type:     r.URL.Query().Get("type"),
+	}
+	commands, total, err := s.Store.ListAllCommands(f, page, pageSize)
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+
+	deviceNames := make(map[uint]string)
+	list := make([]map[string]any, 0, len(commands))
+	for i := range commands {
+		dto := toCommandDTO(&commands[i])
+		name, ok := deviceNames[commands[i].DeviceID]
+		if !ok {
+			if dev, err := s.Store.DeviceByID(commands[i].DeviceID); err == nil {
+				name = dev.Name
+				if name == "" {
+					name = dev.SN
+				}
+			}
+			deviceNames[commands[i].DeviceID] = name
+		}
+		list = append(list, map[string]any{
+			"id": dto.ID, "type": dto.Type, "args": dto.Args, "status": dto.Status,
+			"nak_message": dto.NakMessage, "created_at": dto.CreatedAt,
+			"device_id": commands[i].DeviceID, "device_name": name,
+		})
 	}
 	writeJSON(w, 200, map[string]any{"list": list, "total": total})
 }

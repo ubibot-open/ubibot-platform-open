@@ -41,8 +41,13 @@ func Open(path string) (*Store, error) {
 		&model.DeviceToken{},
 		&model.DeviceRecord{},
 		&model.DeviceCommand{},
+		&model.DeviceProbe{},
+		&model.AlertRule{},
+		&model.AlertEvent{},
+		&model.Role{},
 		&model.AdminUser{},
 		&model.AdminSession{},
+		&model.AuditLog{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}

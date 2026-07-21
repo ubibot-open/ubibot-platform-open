@@ -16,15 +16,23 @@ import (
 // tests can control clock-dependent behaviour (nonce/token expiry, the
 // ±5-minute activation window) deterministically.
 type Server struct {
-	Store  *store.Store
-	Nonces *auth.NonceStore
-	Now    func() time.Time
+	Store       *store.Store
+	Nonces      *auth.NonceStore
+	RateLimiter *IPLimiter
+	Now         func() time.Time
 }
+
+// DefaultRateLimitPerMinute is how many device-facing requests a single
+// IP may make per minute before getting 429/1900 — generous enough for a
+// device reporting every few seconds plus retries, tight enough to blunt
+// a runaway loop or someone scripting against the endpoint.
+const DefaultRateLimitPerMinute = 120
 
 func NewServer(st *store.Store) *Server {
 	return &Server{
-		Store:  st,
-		Nonces: auth.NewNonceStore(),
-		Now:    time.Now,
+		Store:       st,
+		Nonces:      auth.NewNonceStore(),
+		RateLimiter: NewIPLimiter(DefaultRateLimitPerMinute, time.Minute),
+		Now:         time.Now,
 	}
 }

@@ -68,6 +68,12 @@ export default function DevicePage() {
       render: (status: number) =>
         status === 1 ? <Tag color="success">启用</Tag> : <Tag color="default">停用</Tag>,
     },
+    {
+      title: '在线',
+      dataIndex: 'online',
+      width: 80,
+      render: (online: boolean) => (online ? <Tag color="green">在线</Tag> : <Tag color="default">离线</Tag>),
+    },
     { title: '采集/上报间隔(s)', render: (_, r) => `${r.ci} / ${r.ui}` },
     { title: '最近上报', dataIndex: 'last_seen_at', render: formatTime },
     {

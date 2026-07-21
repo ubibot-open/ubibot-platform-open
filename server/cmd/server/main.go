@@ -11,9 +11,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ubibot/ubibot-platform-open/internal/api"
 	"github.com/ubibot/ubibot-platform-open/internal/auth"
+	"github.com/ubibot/ubibot-platform-open/internal/model"
 	"github.com/ubibot/ubibot-platform-open/internal/store"
 )
 
@@ -43,6 +45,12 @@ func main() {
 	srv := api.NewServer(st)
 	r := api.NewRouter(srv)
 
+	// Offline-alert detection is the absence of a report, so nothing about
+	// receiving one can trigger it — a periodic sweep is the only way to
+	// notice. Runs independently of request traffic for the life of the
+	// process.
+	go runOfflineSweepLoop(st, 30*time.Second)
+
 	addr := os.Getenv("UBIBOT_LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"
@@ -54,8 +62,18 @@ func main() {
 	}
 }
 
-// bootstrapAdmin creates a default admin account on first run so there is
-// always a way to log in. The password is either read from
+func runOfflineSweepLoop(st *store.Store, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := st.OfflineSweep(time.Now()); err != nil {
+			log.Printf("offline sweep error: %v", err)
+		}
+	}
+}
+
+// bootstrapAdmin creates a default super-admin role and account on first
+// run so there is always a way to log in. The password is either read from
 // UBIBOT_ADMIN_PASSWORD (set this in production) or generated and printed
 // once — there is no other way to recover it afterward short of resetting
 // the admin_users table.
@@ -66,6 +84,14 @@ func bootstrapAdmin(st *store.Store) error {
 	}
 	if n > 0 {
 		return nil
+	}
+
+	role, err := st.RoleByCode(model.RoleSuper)
+	if errors.Is(err, store.ErrNotFound) {
+		role, err = st.CreateRole("超级管理员", model.RoleSuper, []string{"*"})
+	}
+	if err != nil {
+		return err
 	}
 
 	username := "admin"
@@ -83,7 +109,7 @@ func bootstrapAdmin(st *store.Store) error {
 	if err != nil {
 		return err
 	}
-	if _, err := st.CreateAdmin(username, hash); err != nil {
+	if _, err := st.CreateAdmin(username, hash, role.ID); err != nil {
 		return err
 	}
 

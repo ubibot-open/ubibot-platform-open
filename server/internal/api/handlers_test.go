@@ -239,11 +239,15 @@ func TestAdminLoginAndCommandDispatchFlow(t *testing.T) {
 	env := newTestEnv(t)
 	deviceToken := env.activateViaNonce(t)
 
+	role, err := env.srv.Store.CreateRole("超级管理员", model.RoleSuper, []string{"*"})
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
 	hash, err := auth.HashPassword("s3cret-pw")
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
-	if _, err := env.srv.Store.CreateAdmin("admin", hash); err != nil {
+	if _, err := env.srv.Store.CreateAdmin("admin", hash, role.ID); err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
 

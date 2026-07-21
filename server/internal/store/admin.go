@@ -25,12 +25,58 @@ func (s *Store) CountAdmins() (int64, error) {
 
 // CreateAdmin inserts an admin account with an already-hashed password —
 // callers use internal/auth.HashPassword, this layer never sees plaintext.
-func (s *Store) CreateAdmin(username, passwordHash string) (*model.AdminUser, error) {
-	a := &model.AdminUser{Username: username, PasswordHash: passwordHash}
+// roleID is optional; 0 leaves the account roleless until assigned (see
+// UpdateAdminRole) rather than defaulting it to something guessable.
+func (s *Store) CreateAdmin(username, passwordHash string, roleID uint) (*model.AdminUser, error) {
+	a := &model.AdminUser{Username: username, PasswordHash: passwordHash, RoleID: roleID}
 	if err := s.db.Create(a).Error; err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+// ListAdminUsers returns every admin account, newest first.
+func (s *Store) ListAdminUsers() ([]model.AdminUser, error) {
+	var rows []model.AdminUser
+	err := s.db.Order("id desc").Find(&rows).Error
+	return rows, err
+}
+
+func (s *Store) AdminByID(id uint) (*model.AdminUser, error) {
+	var a model.AdminUser
+	if err := s.db.First(&a, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &a, nil
+}
+
+// UpdateAdminRole reassigns which role an admin account has.
+func (s *Store) UpdateAdminRole(id, roleID uint) error {
+	return s.db.Model(&model.AdminUser{}).Where("id = ?", id).Update("role_id", roleID).Error
+}
+
+// UpdateAdminPassword resets an account's password (already hashed).
+func (s *Store) UpdateAdminPassword(id uint, passwordHash string) error {
+	return s.db.Model(&model.AdminUser{}).Where("id = ?", id).Update("password_hash", passwordHash).Error
+}
+
+// DeleteAdmin removes an admin account and any sessions it holds.
+func (s *Store) DeleteAdmin(id uint) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("admin_id = ?", id).Delete(&model.AdminSession{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.AdminUser{}, id).Error
+	})
+}
+
+// AdminRole loads the role assigned to admin — used by RequirePermission
+// (see internal/api/middleware.go) to check what the account can do.
+func (s *Store) AdminRole(admin *model.AdminUser) (*model.Role, error) {
+	return s.RoleByID(admin.RoleID)
 }
 
 func (s *Store) AdminByUsername(username string) (*model.AdminUser, error) {

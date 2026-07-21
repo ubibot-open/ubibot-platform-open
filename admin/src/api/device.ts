@@ -6,6 +6,7 @@ export interface Device {
   sn: string
   name: string
   status: number
+  online: boolean
   ci: number
   ui: number
   fe: string[] | null
@@ -61,4 +62,43 @@ export function listCommands(id: number, page = 1, pageSize = 20) {
   return api.get<{ list: DeviceCommand[]; total: number }>(
     `/api/admin/devices/${id}/commands?page=${page}&page_size=${pageSize}`,
   )
+}
+
+// getDeviceRecords is the "历史数据查询" backing call — start/end are Unix
+// seconds, omit either to leave that bound open.
+export function getDeviceRecords(id: number, opts: { start?: number; end?: number; page?: number; pageSize?: number }) {
+  const params = new URLSearchParams()
+  if (opts.start) params.set('start', String(opts.start))
+  if (opts.end) params.set('end', String(opts.end))
+  params.set('page', String(opts.page ?? 1))
+  params.set('page_size', String(opts.pageSize ?? 50))
+  return api.get<{ list: DeviceRecord[]; total: number }>(`/api/admin/devices/${id}/records?${params}`)
+}
+
+// --- probes (protocol §7.2 set_probe) -------------------------------------
+
+export interface Probe {
+  pid: string
+  key: string
+  iface: string
+  proto: string
+  params: Record<string, unknown> | null
+  status: 'pending' | 'applied' | 'failed' | 'removing'
+  last_command_id?: string
+  last_error?: string
+}
+
+export function listProbes(deviceId: number) {
+  return api.get<{ list: Probe[] }>(`/api/admin/devices/${deviceId}/probes`)
+}
+
+export function upsertProbe(
+  deviceId: number,
+  input: { pid: string; key: string; iface: string; proto: string; params?: Record<string, unknown> },
+) {
+  return api.post<{ probe: Probe; command: DeviceCommand }>(`/api/admin/devices/${deviceId}/probes`, input)
+}
+
+export function removeProbe(deviceId: number, pid: string) {
+  return api.del<{ command: DeviceCommand }>(`/api/admin/devices/${deviceId}/probes/${encodeURIComponent(pid)}`)
 }

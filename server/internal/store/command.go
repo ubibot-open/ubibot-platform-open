@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"gorm.io/gorm"
+
 	"github.com/ubibot/ubibot-platform-open/internal/model"
 	"github.com/ubibot/ubibot-platform-open/internal/protocol"
 )
@@ -98,6 +100,27 @@ func (s *Store) NakCommands(deviceID uint, naks []protocol.Nak) error {
 	return nil
 }
 
+// CommandTypesByIDs looks up the Type of each of the given command ids
+// (scoped to deviceID), used by ProcessReport to decide which acked/nacked
+// commands need their set_probe-specific side effects applied.
+func (s *Store) CommandTypesByIDs(deviceID uint, cmdIDs []string) (map[string]string, error) {
+	if len(cmdIDs) == 0 {
+		return nil, nil
+	}
+	var rows []model.DeviceCommand
+	err := s.db.Select("cmd_id", "type").
+		Where("device_id = ? AND cmd_id IN ?", deviceID, cmdIDs).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.CmdID] = r.Type
+	}
+	return out, nil
+}
+
 // ListCommands returns a device's command history, newest first, for the
 // admin device-detail page.
 func (s *Store) ListCommands(deviceID uint, page, pageSize int) ([]model.DeviceCommand, int64, error) {
@@ -119,6 +142,51 @@ func (s *Store) ListCommands(deviceID uint, page, pageSize int) ([]model.DeviceC
 		Offset((page - 1) * pageSize).
 		Limit(pageSize).
 		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+// CommandFilter narrows ListAllCommands to a subset — zero values mean
+// "don't filter on this field".
+type CommandFilter struct {
+	DeviceID uint
+	Status   string
+	Type     string
+}
+
+// ListAllCommands returns command history across every device (for the
+// admin "指令管理" page, as opposed to ListCommands which is scoped to one
+// device's detail view).
+func (s *Store) ListAllCommands(f CommandFilter, page, pageSize int) ([]model.DeviceCommand, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	scope := func(db *gorm.DB) *gorm.DB {
+		if f.DeviceID != 0 {
+			db = db.Where("device_id = ?", f.DeviceID)
+		}
+		if f.Status != "" {
+			db = db.Where("status = ?", f.Status)
+		}
+		if f.Type != "" {
+			db = db.Where("type = ?", f.Type)
+		}
+		return db
+	}
+
+	var total int64
+	if err := scope(s.db.Model(&model.DeviceCommand{})).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []model.DeviceCommand
+	err := scope(s.db).Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}

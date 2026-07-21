@@ -12,6 +12,27 @@ import (
 
 var ErrNotFound = errors.New("not found")
 
+// MinOfflineGrace is the floor on how long a device can go quiet before
+// it's considered offline, regardless of how short its configured upload
+// interval is — a device reporting every 5s shouldn't flip offline the
+// instant one upload is a few seconds late.
+const MinOfflineGrace = 2 * time.Minute
+
+// IsDeviceOnline applies the same "quiet for longer than 3x its upload
+// interval (floored at MinOfflineGrace)" rule the offline-alert sweep uses
+// (see OfflineSweep in alert.go) — used here so the admin device list/detail
+// view and the alert system never disagree about what "online" means.
+func IsDeviceOnline(dev *model.Device, now time.Time) bool {
+	if dev.LastSeenAt == nil {
+		return false
+	}
+	grace := time.Duration(dev.UI) * 3 * time.Second
+	if grace < MinOfflineGrace {
+		grace = MinOfflineGrace
+	}
+	return now.Sub(*dev.LastSeenAt) <= grace
+}
+
 // CreateDevice provisions a new device row. Secret is stored as given —
 // callers (see internal/auth.NewDeviceSecret) are responsible for
 // generating something with enough entropy; this layer just persists it.
@@ -105,9 +126,12 @@ func (s *Store) SetDeviceStatus(id uint, status int) error {
 	return s.db.Model(&model.Device{}).Where("id = ?", id).Update("status", status).Error
 }
 
-// TouchLastSeen records that a device just successfully reported in.
-func (s *Store) TouchLastSeen(id uint) error {
-	now := time.Now()
+// TouchLastSeen records that a device just successfully reported in. now
+// is caller-supplied (see api.Server.Now) rather than time.Now() directly
+// so the online/offline window this feeds (IsDeviceOnline, OfflineSweep)
+// can be driven by a test's mocked clock instead of the wall clock, the
+// same pattern the activation-window checks already use.
+func (s *Store) TouchLastSeen(id uint, now time.Time) error {
 	return s.db.Model(&model.Device{}).Where("id = ?", id).Update("last_seen_at", now).Error
 }
 

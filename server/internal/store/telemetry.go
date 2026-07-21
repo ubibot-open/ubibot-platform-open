@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/ubibot/ubibot-platform-open/internal/model"
@@ -32,8 +33,7 @@ func (s *Store) SaveRecords(deviceID uint, recs []protocol.Record) error {
 }
 
 // RecentRecords returns a device's most recent telemetry, newest first —
-// enough for the admin device-detail page (see internal/api/admin_handlers.go).
-// Full historical query/filtering is out of scope for this slice.
+// used by the admin device-detail page's "最近上报数据" panel.
 func (s *Store) RecentRecords(deviceID uint, limit int) ([]model.DeviceRecord, error) {
 	if limit < 1 || limit > 200 {
 		limit = 20
@@ -44,4 +44,40 @@ func (s *Store) RecentRecords(deviceID uint, limit int) ([]model.DeviceRecord, e
 		Limit(limit).
 		Find(&rows).Error
 	return rows, err
+}
+
+// QueryRecords returns a device's telemetry within [start, end] (Unix
+// seconds; either may be 0 to leave that bound open), oldest first — this
+// is the "历史数据查询" page's backing query, as opposed to RecentRecords'
+// fixed newest-first snapshot for the detail view.
+func (s *Store) QueryRecords(deviceID uint, start, end int64, page, pageSize int) ([]model.DeviceRecord, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 500 {
+		pageSize = 100
+	}
+
+	scope := func(db *gorm.DB) *gorm.DB {
+		db = db.Where("device_id = ?", deviceID)
+		if start > 0 {
+			db = db.Where("ts >= ?", start)
+		}
+		if end > 0 {
+			db = db.Where("ts <= ?", end)
+		}
+		return db
+	}
+
+	var total int64
+	if err := scope(s.db.Model(&model.DeviceRecord{})).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []model.DeviceRecord
+	err := scope(s.db).Order("ts asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
 }
