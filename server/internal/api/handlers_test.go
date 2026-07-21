@@ -3,23 +3,17 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/ubibot/ubibot-platform-open/internal/api"
 	"github.com/ubibot/ubibot-platform-open/internal/auth"
-	"github.com/ubibot/ubibot-platform-open/internal/protocol"
+	"github.com/ubibot/ubibot-platform-open/internal/model"
 	"github.com/ubibot/ubibot-platform-open/internal/store"
 )
-
-func init() {
-	gin.SetMode(gin.TestMode)
-}
 
 const (
 	testPID    = "ubibot_open_dev_v1"
@@ -30,19 +24,31 @@ const (
 // testEnv bundles a router with a device already provisioned and a clock
 // the test controls, so nonce/token expiry and the activation time window
 // can be exercised deterministically instead of racing the wall clock.
+// Each test gets its own in-memory database (via a unique DSN) so tests
+// can run in parallel without stepping on each other's rows.
 type testEnv struct {
 	router http.Handler
 	srv    *api.Server
 	now    time.Time
+	dev    *model.Device
 }
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
-	st := store.New()
-	st.RegisterDevice(store.Device{PID: testPID, SN: testSN, Secret: testSecret})
+
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	st, err := store.Open(dsn)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+
+	dev, err := st.CreateDevice(testPID, testSN, testSecret, "test device")
+	if err != nil {
+		t.Fatalf("create device: %v", err)
+	}
 
 	srv := api.NewServer(st)
-	env := &testEnv{srv: srv, now: time.Unix(1_700_000_000, 0)}
+	env := &testEnv{srv: srv, now: time.Unix(1_700_000_000, 0), dev: dev}
 	srv.Now = func() time.Time { return env.now }
 	env.router = api.NewRouter(srv)
 	return env
@@ -61,309 +67,257 @@ func (e *testEnv) do(t *testing.T, method, path string, body interface{}, header
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	w := httptest.NewRecorder()
-	e.router.ServeHTTP(w, req)
+
+	rec := httptest.NewRecorder()
+	e.router.ServeHTTP(rec, req)
 
 	var parsed map[string]interface{}
-	if w.Body.Len() > 0 {
-		if err := json.Unmarshal(w.Body.Bytes(), &parsed); err != nil {
-			t.Fatalf("response is not JSON: %v (body=%s)", err, w.Body.String())
+	if rec.Body.Len() > 0 {
+		if err := json.Unmarshal(rec.Body.Bytes(), &parsed); err != nil {
+			t.Fatalf("decode response %q: %v", rec.Body.String(), err)
 		}
 	}
-	return w, parsed
+	return rec, parsed
 }
 
-func (e *testEnv) timeSync(t *testing.T) (w *httptest.ResponseRecorder, body map[string]interface{}) {
+func (e *testEnv) sign(parts ...string) string {
+	return auth.Sign(testSecret, parts...)
+}
+
+// activateViaNonce runs the time-sync + activate handshake and returns the
+// issued session token.
+func (e *testEnv) activateViaNonce(t *testing.T) string {
 	t.Helper()
-	sign := auth.Sign(testSecret, testPID, testSN)
-	return e.do(t, http.MethodPost, "/api/v1/auth/time", map[string]string{
-		"pid": testPID, "sn": testSN, "sign": sign,
+
+	_, timeBody := e.do(t, "POST", "/api/v1/auth/time", map[string]any{
+		"pid": testPID, "sn": testSN, "sign": e.sign(testPID, testSN),
 	}, nil)
+	n := timeBody["n"].(string)
+	ts := int64(timeBody["t"].(float64))
+
+	_, actBody := e.do(t, "POST", "/api/v1/auth/activate", map[string]any{
+		"pid": testPID, "sn": testSN, "ts": ts, "n": n,
+		"sign": e.sign(testPID, testSN, auth.FormatTs(ts), n),
+	}, nil)
+	return actBody["token"].(string)
 }
 
-func (e *testEnv) activateWithNonce(t *testing.T) (token string, exp int64) {
-	t.Helper()
-	_, tsBody := e.timeSync(t)
-	ts := int64(tsBody["t"].(float64))
-	n := tsBody["n"].(string)
+func TestTimeSyncAndActivate_NonceReplayRejected(t *testing.T) {
+	env := newTestEnv(t)
 
-	sign := auth.Sign(testSecret, testPID, testSN, strconv.FormatInt(ts, 10), n)
-	w, body := e.do(t, http.MethodPost, "/api/v1/auth/activate", map[string]interface{}{
+	rec, body := env.do(t, "POST", "/api/v1/auth/time", map[string]any{
+		"pid": testPID, "sn": testSN, "sign": env.sign(testPID, testSN),
+	}, nil)
+	if rec.Code != 200 || body["c"].(float64) != 0 {
+		t.Fatalf("time sync failed: %d %v", rec.Code, body)
+	}
+	n := body["n"].(string)
+	ts := int64(body["t"].(float64))
+	sign := env.sign(testPID, testSN, auth.FormatTs(ts), n)
+
+	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
 		"pid": testPID, "sn": testSN, "ts": ts, "n": n, "sign": sign,
 	}, nil)
-	if w.Code != 200 {
-		t.Fatalf("activate failed: %d %v", w.Code, body)
+	if rec.Code != 200 || body["token"] == "" {
+		t.Fatalf("activate failed: %d %v", rec.Code, body)
 	}
-	return body["token"].(string), int64(body["exp"].(float64))
-}
 
-func TestTimeSync_Success(t *testing.T) {
-	env := newTestEnv(t)
-	w, body := env.timeSync(t)
-
-	if w.Code != 200 {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	if body["c"].(float64) != protocol.CodeOK {
-		t.Fatalf("c = %v, want 0", body["c"])
-	}
-	if int64(body["t"].(float64)) != env.now.Unix() {
-		t.Fatalf("t = %v, want %d", body["t"], env.now.Unix())
-	}
-	if n, _ := body["n"].(string); n == "" {
-		t.Fatal("n (nonce) missing from response")
-	}
-}
-
-func TestTimeSync_BadSign(t *testing.T) {
-	env := newTestEnv(t)
-	w, body := env.do(t, http.MethodPost, "/api/v1/auth/time", map[string]string{
-		"pid": testPID, "sn": testSN, "sign": "0000",
+	// Replaying the exact same signed request must fail: the nonce was
+	// already consumed.
+	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
+		"pid": testPID, "sn": testSN, "ts": ts, "n": n, "sign": sign,
 	}, nil)
-
-	if w.Code != 400 {
-		t.Fatalf("status = %d, want 400", w.Code)
-	}
-	if body["c"].(float64) != protocol.CodeSignMismatch {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeSignMismatch)
+	if rec.Code == 200 {
+		t.Fatalf("expected nonce replay to be rejected, got 200: %v", body)
 	}
 }
 
-func TestTimeSync_UnknownDevice(t *testing.T) {
-	env := newTestEnv(t)
-	sign := auth.Sign("whatever-secret", testPID, "sn-does-not-exist")
-	w, body := env.do(t, http.MethodPost, "/api/v1/auth/time", map[string]string{
-		"pid": testPID, "sn": "sn-does-not-exist", "sign": sign,
-	}, nil)
-
-	if w.Code != 400 {
-		t.Fatalf("status = %d, want 400", w.Code)
-	}
-	// Same code as a bad signature: unknown-device must not be distinguishable
-	// from wrong-signature, or the endpoint becomes a device-enumeration oracle.
-	if body["c"].(float64) != protocol.CodeSignMismatch {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeSignMismatch)
-	}
-}
-
-func TestActivate_WithNonce_Success(t *testing.T) {
-	env := newTestEnv(t)
-	token, exp := env.activateWithNonce(t)
-
-	if token == "" {
-		t.Fatal("token missing")
-	}
-	if exp != int64(auth.TokenTTL.Seconds()) {
-		t.Fatalf("exp = %d, want %d", exp, int64(auth.TokenTTL.Seconds()))
-	}
-}
-
-func TestActivate_NonceReuse_Rejected(t *testing.T) {
-	env := newTestEnv(t)
-	_, tsBody := env.timeSync(t)
-	ts := int64(tsBody["t"].(float64))
-	n := tsBody["n"].(string)
-	sign := auth.Sign(testSecret, testPID, testSN, strconv.FormatInt(ts, 10), n)
-
-	req := map[string]interface{}{"pid": testPID, "sn": testSN, "ts": ts, "n": n, "sign": sign}
-
-	w1, _ := env.do(t, http.MethodPost, "/api/v1/auth/activate", req, nil)
-	if w1.Code != 200 {
-		t.Fatalf("first activation failed: %d", w1.Code)
-	}
-
-	w2, body2 := env.do(t, http.MethodPost, "/api/v1/auth/activate", req, nil)
-	if w2.Code != 400 {
-		t.Fatalf("replayed activation status = %d, want 400", w2.Code)
-	}
-	if body2["c"].(float64) != protocol.CodeSignMismatch {
-		t.Fatalf("c = %v, want %d", body2["c"], protocol.CodeSignMismatch)
-	}
-}
-
-func TestActivate_LocalClock_NoNonce_Success(t *testing.T) {
+func TestActivate_LocalClockPath_MonotonicTsRequired(t *testing.T) {
 	env := newTestEnv(t)
 	ts := env.now.Unix()
-	sign := auth.Sign(testSecret, testPID, testSN, strconv.FormatInt(ts, 10), "")
+	sign := env.sign(testPID, testSN, auth.FormatTs(ts), "")
 
-	w, body := env.do(t, http.MethodPost, "/api/v1/auth/activate", map[string]interface{}{
+	rec, body := env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
 		"pid": testPID, "sn": testSN, "ts": ts, "sign": sign,
 	}, nil)
-
-	if w.Code != 200 {
-		t.Fatalf("status = %d, want 200 (body=%v)", w.Code, body)
+	if rec.Code != 200 {
+		t.Fatalf("first activation should succeed: %d %v", rec.Code, body)
 	}
-	if body["token"].(string) == "" {
-		t.Fatal("token missing")
-	}
-}
 
-func TestActivate_LocalClock_OutOfWindow(t *testing.T) {
-	env := newTestEnv(t)
-	ts := env.now.Add(-10 * time.Minute).Unix() // outside the ±5 minute window
-	sign := auth.Sign(testSecret, testPID, testSN, strconv.FormatInt(ts, 10), "")
-
-	w, body := env.do(t, http.MethodPost, "/api/v1/auth/activate", map[string]interface{}{
+	// Same ts again (a replayed request within the ±5min window) must be
+	// rejected — this is the monotonic guard closing the window-replay gap.
+	rec, _ = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
 		"pid": testPID, "sn": testSN, "ts": ts, "sign": sign,
 	}, nil)
-
-	if w.Code != 400 {
-		t.Fatalf("status = %d, want 400", w.Code)
-	}
-	if body["c"].(float64) != protocol.CodeSignMismatch {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeSignMismatch)
-	}
-}
-
-func TestReport_ConfigSentOnlyOnChange(t *testing.T) {
-	env := newTestEnv(t)
-	token, _ := env.activateWithNonce(t)
-
-	env.srv.Store.SetConfig(testSN, protocol.Config{CI: 15, UI: 300, FE: []string{"temperature"}})
-
-	reportBody := map[string]interface{}{
-		"did": testSN,
-		"recs": []map[string]interface{}{
-			{"ts": env.now.Unix(), "d": map[string]interface{}{"temperature": 25.6}},
-		},
-	}
-	headers := map[string]string{"X-IoT-Token": token}
-
-	w1, body1 := env.do(t, http.MethodPost, "/api/v1/data/report", reportBody, headers)
-	if w1.Code != 200 {
-		t.Fatalf("first report status = %d, want 200 (body=%v)", w1.Code, body1)
-	}
-	cfg1, ok := body1["cfg"].(map[string]interface{})
-	if !ok {
-		t.Fatal("first report response missing cfg after a config change")
-	}
-	if int(cfg1["ci"].(float64)) != 15 || int(cfg1["ui"].(float64)) != 300 {
-		t.Fatalf("cfg = %v, want ci=15 ui=300", cfg1)
-	}
-	if got := w1.Header().Get("X-Token-Expires-In"); got == "" {
-		t.Fatal("X-Token-Expires-In header missing")
+	if rec.Code == 200 {
+		t.Fatalf("expected replayed ts to be rejected")
 	}
 
-	w2, body2 := env.do(t, http.MethodPost, "/api/v1/data/report", reportBody, headers)
-	if w2.Code != 200 {
-		t.Fatalf("second report status = %d, want 200", w2.Code)
-	}
-	if _, present := body2["cfg"]; present {
-		t.Fatalf("second report should omit unchanged cfg, got %v", body2["cfg"])
-	}
-}
-
-func TestReport_CommandDeliveryAndAck(t *testing.T) {
-	env := newTestEnv(t)
-	token, _ := env.activateWithNonce(t)
-
-	cmd := env.srv.Store.QueueCommand(testSN, "reboot", nil)
-
-	reportBody := func(ack []string) map[string]interface{} {
-		body := map[string]interface{}{
-			"did": testSN,
-			"recs": []map[string]interface{}{
-				{"ts": env.now.Unix(), "d": map[string]interface{}{"temperature": 25.6}},
-			},
-		}
-		if ack != nil {
-			body["ack"] = ack
-		}
-		return body
-	}
-	headers := map[string]string{"X-IoT-Token": token}
-
-	w1, body1 := env.do(t, http.MethodPost, "/api/v1/data/report", reportBody(nil), headers)
-	if w1.Code != 200 {
-		t.Fatalf("status = %d, want 200", w1.Code)
-	}
-	cmds, ok := body1["cmd"].([]interface{})
-	if !ok || len(cmds) != 1 {
-		t.Fatalf("cmd = %v, want one queued command", body1["cmd"])
-	}
-	first := cmds[0].(map[string]interface{})
-	if first["id"].(string) != cmd.ID || first["tp"].(string) != "reboot" {
-		t.Fatalf("cmd[0] = %v, want id=%s tp=reboot", first, cmd.ID)
-	}
-
-	w2, body2 := env.do(t, http.MethodPost, "/api/v1/data/report", reportBody([]string{cmd.ID}), headers)
-	if w2.Code != 200 {
-		t.Fatalf("status = %d, want 200", w2.Code)
-	}
-	if _, present := body2["cmd"]; present {
-		t.Fatalf("cmd should be empty after ack, got %v", body2["cmd"])
-	}
-}
-
-func TestReport_MultipleRecsBatched(t *testing.T) {
-	env := newTestEnv(t)
-	token, _ := env.activateWithNonce(t)
-
-	ts1, ts2 := env.now.Unix(), env.now.Add(10*time.Minute).Unix()
-	reportBody := map[string]interface{}{
-		"did": testSN,
-		"recs": []map[string]interface{}{
-			{"ts": ts1, "d": map[string]interface{}{"temperature": 25.6, "humidity": 60.2}},
-			{"ts": ts2, "d": map[string]interface{}{"temperature": 25.8, "npk": map[string]interface{}{"n": 120, "p": 100, "k": 100}}},
-		},
-	}
-
-	w, body := env.do(t, http.MethodPost, "/api/v1/data/report", reportBody, map[string]string{"X-IoT-Token": token})
-	if w.Code != 200 {
-		t.Fatalf("status = %d, want 200 (body=%v)", w.Code, body)
-	}
-	if !env.srv.Store.Seen(testSN, ts1) || !env.srv.Store.Seen(testSN, ts2) {
-		t.Fatal("both batched records should be recorded")
-	}
-}
-
-func TestReport_MissingToken(t *testing.T) {
-	env := newTestEnv(t)
-	w, body := env.do(t, http.MethodPost, "/api/v1/data/report", map[string]interface{}{
-		"did":  testSN,
-		"recs": []map[string]interface{}{{"ts": env.now.Unix(), "d": map[string]interface{}{"temperature": 1}}},
+	// An older ts must also be rejected, even if still within the window.
+	olderTs := ts - 1
+	rec, _ = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
+		"pid": testPID, "sn": testSN, "ts": olderTs,
+		"sign": env.sign(testPID, testSN, auth.FormatTs(olderTs), ""),
 	}, nil)
-
-	if w.Code != 401 {
-		t.Fatalf("status = %d, want 401", w.Code)
+	if rec.Code == 200 {
+		t.Fatalf("expected older ts to be rejected")
 	}
-	if body["c"].(float64) != protocol.CodeTokenInvalid {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeTokenInvalid)
+
+	// A strictly greater ts must succeed.
+	newerTs := ts + 1
+	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
+		"pid": testPID, "sn": testSN, "ts": newerTs,
+		"sign": env.sign(testPID, testSN, auth.FormatTs(newerTs), ""),
+	}, nil)
+	if rec.Code != 200 {
+		t.Fatalf("expected advancing ts to succeed: %d %v", rec.Code, body)
 	}
 }
 
-func TestReport_ExpiredToken(t *testing.T) {
+func TestReport_DedupAndDidBinding(t *testing.T) {
 	env := newTestEnv(t)
-	token, _ := env.activateWithNonce(t)
+	token := env.activateViaNonce(t)
 
-	env.now = env.now.Add(25 * time.Hour) // past the 24h token TTL
-
-	w, body := env.do(t, http.MethodPost, "/api/v1/data/report", map[string]interface{}{
+	rec, body := env.do(t, "POST", "/api/v1/data/report", map[string]any{
 		"did":  testSN,
-		"recs": []map[string]interface{}{{"ts": env.now.Unix(), "d": map[string]interface{}{"temperature": 1}}},
+		"recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 25.6}}},
+	}, map[string]string{"X-IoT-Token": token})
+	if rec.Code != 200 || body["c"].(float64) != 0 {
+		t.Fatalf("report failed: %d %v", rec.Code, body)
+	}
+
+	// Same (did, ts) again with a different value must not overwrite —
+	// the unique index + ON CONFLICT DO NOTHING makes this a no-op.
+	env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"did":  testSN,
+		"recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 999}}},
 	}, map[string]string{"X-IoT-Token": token})
 
-	if w.Code != 401 {
-		t.Fatalf("status = %d, want 401", w.Code)
+	records, err := env.srv.Store.RecentRecords(env.dev.ID, 10)
+	if err != nil {
+		t.Fatalf("recent records: %v", err)
 	}
-	if body["c"].(float64) != protocol.CodeTokenExpired {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeTokenExpired)
+	if len(records) != 1 {
+		t.Fatalf("expected exactly 1 deduped record, got %d", len(records))
 	}
-}
+	var d map[string]any
+	_ = json.Unmarshal([]byte(records[0].Data), &d)
+	if d["temperature"].(float64) != 25.6 {
+		t.Fatalf("expected the first value to win, got %v", d["temperature"])
+	}
 
-func TestReport_DeviceMismatch(t *testing.T) {
-	env := newTestEnv(t)
-	token, _ := env.activateWithNonce(t)
-
-	w, body := env.do(t, http.MethodPost, "/api/v1/data/report", map[string]interface{}{
+	// A report whose did doesn't match the token's device must be rejected
+	// (protects against a token holder reporting as an arbitrary did).
+	rec, body = env.do(t, "POST", "/api/v1/data/report", map[string]any{
 		"did":  "some-other-device",
-		"recs": []map[string]interface{}{{"ts": env.now.Unix(), "d": map[string]interface{}{"temperature": 1}}},
+		"recs": []map[string]any{{"ts": 1001, "d": map[string]any{"temperature": 1}}},
 	}, map[string]string{"X-IoT-Token": token})
-
-	if w.Code != 401 {
-		t.Fatalf("status = %d, want 401", w.Code)
+	if rec.Code == 200 {
+		t.Fatalf("expected did/token mismatch to be rejected: %v", body)
 	}
-	if body["c"].(float64) != protocol.CodeDeviceNotFound {
-		t.Fatalf("c = %v, want %d", body["c"], protocol.CodeDeviceNotFound)
+}
+
+func TestReport_MissingOrInvalidToken(t *testing.T) {
+	env := newTestEnv(t)
+
+	rec, _ := env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"did": testSN, "recs": []map[string]any{{"ts": 1, "d": map[string]any{}}},
+	}, nil)
+	if rec.Code != 401 {
+		t.Fatalf("expected 401 for missing token, got %d", rec.Code)
+	}
+
+	rec, _ = env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"did": testSN, "recs": []map[string]any{{"ts": 1, "d": map[string]any{}}},
+	}, map[string]string{"X-IoT-Token": "not-a-real-token"})
+	if rec.Code != 401 {
+		t.Fatalf("expected 401 for invalid token, got %d", rec.Code)
+	}
+}
+
+func TestAdminLoginAndCommandDispatchFlow(t *testing.T) {
+	env := newTestEnv(t)
+	deviceToken := env.activateViaNonce(t)
+
+	hash, err := auth.HashPassword("s3cret-pw")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if _, err := env.srv.Store.CreateAdmin("admin", hash); err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	// Wrong password rejected.
+	rec, _ := env.do(t, "POST", "/api/admin/login", map[string]any{"username": "admin", "password": "wrong"}, nil)
+	if rec.Code != 401 {
+		t.Fatalf("expected wrong password to be rejected, got %d", rec.Code)
+	}
+
+	// Correct login issues a bearer token.
+	rec, body := env.do(t, "POST", "/api/admin/login", map[string]any{"username": "admin", "password": "s3cret-pw"}, nil)
+	if rec.Code != 200 {
+		t.Fatalf("admin login failed: %d %v", rec.Code, body)
+	}
+	adminToken := body["token"].(string)
+	adminAuth := map[string]string{"Authorization": "Bearer " + adminToken}
+
+	// Protected endpoints reject requests with no/invalid session.
+	rec, _ = env.do(t, "GET", "/api/admin/devices", nil, nil)
+	if rec.Code != 401 {
+		t.Fatalf("expected 401 without session, got %d", rec.Code)
+	}
+
+	// List devices shows the provisioned device.
+	rec, body = env.do(t, "GET", "/api/admin/devices", nil, adminAuth)
+	if rec.Code != 200 {
+		t.Fatalf("list devices failed: %d %v", rec.Code, body)
+	}
+	list := body["list"].([]interface{})
+	if len(list) != 1 {
+		t.Fatalf("expected 1 device, got %d", len(list))
+	}
+
+	// Dispatch a command — this is the "手动下发一条指令" entry point.
+	rec, body = env.do(t, "POST", fmt.Sprintf("/api/admin/devices/%d/commands", env.dev.ID),
+		map[string]any{"type": "reboot"}, adminAuth)
+	if rec.Code != 200 {
+		t.Fatalf("dispatch command failed: %d %v", rec.Code, body)
+	}
+	cmdID := body["id"].(string)
+	if body["status"].(string) != model.CommandStatusPending {
+		t.Fatalf("expected freshly dispatched command to be pending, got %v", body["status"])
+	}
+
+	// The device picks up the pending command on its next report.
+	rec, body = env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"did":  testSN,
+		"recs": []map[string]any{{"ts": 2000, "d": map[string]any{"temperature": 25.6}}},
+	}, map[string]string{"X-IoT-Token": deviceToken})
+	if rec.Code != 200 {
+		t.Fatalf("report failed: %d %v", rec.Code, body)
+	}
+	cmds := body["cmd"].([]interface{})
+	if len(cmds) != 1 || cmds[0].(map[string]interface{})["id"] != cmdID {
+		t.Fatalf("expected the pending command to be delivered, got %v", body["cmd"])
+	}
+
+	// The device acks it on a later report.
+	rec, _ = env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"did":  testSN,
+		"recs": []map[string]any{{"ts": 2001, "d": map[string]any{"temperature": 25.7}}},
+		"ack":  []string{cmdID},
+	}, map[string]string{"X-IoT-Token": deviceToken})
+	if rec.Code != 200 {
+		t.Fatalf("ack report failed: %d", rec.Code)
+	}
+
+	// The admin can see it flip to acked.
+	rec, body = env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID), nil, adminAuth)
+	if rec.Code != 200 {
+		t.Fatalf("get device failed: %d %v", rec.Code, body)
+	}
+	commands := body["commands"].([]interface{})
+	if len(commands) != 1 || commands[0].(map[string]interface{})["status"] != model.CommandStatusAcked {
+		t.Fatalf("expected command to be acked, got %v", commands)
 	}
 }

@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 import { menuTree, type MenuNode } from '../router/menu'
 import { useThemeMode } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const { Header, Sider, Content } = Layout
 
@@ -50,6 +51,7 @@ export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { mode, toggle } = useThemeMode()
+  const { username, logout } = useAuth()
 
   const trail = useMemo(() => findTrail(location.pathname), [location.pathname])
   const selectedKeys = trail.length ? [trail[trail.length - 1].key] : []
@@ -60,6 +62,13 @@ export default function AppLayout() {
     { type: 'divider' },
     { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true },
   ]
+
+  const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'logout') {
+      logout()
+      navigate('/login', { replace: true })
+    }
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -142,11 +151,11 @@ export default function AppLayout() {
           >
             <Button type="text" icon={<Badge dot offset={[-2, 2]}><BellOutlined /></Badge>} aria-label="通知" />
           </Popover>
-          <Dropdown menu={{ items: userMenuItems }} trigger={['click']}>
+          <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={['click']}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, cursor: 'pointer' }}>
               <Avatar size={28} icon={<UserOutlined />} />
               <div style={{ lineHeight: 1.3 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>chen</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{username}</div>
                 <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }}>管理员</div>
               </div>
               <DownOutlined style={{ fontSize: 11 }} />

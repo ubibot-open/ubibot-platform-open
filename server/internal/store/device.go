@@ -1,0 +1,129 @@
+package store
+
+import (
+	"encoding/json"
+	"errors"
+	"time"
+
+	"gorm.io/gorm"
+
+	"github.com/ubibot/ubibot-platform-open/internal/model"
+)
+
+var ErrNotFound = errors.New("not found")
+
+// CreateDevice provisions a new device row. Secret is stored as given —
+// callers (see internal/auth.NewDeviceSecret) are responsible for
+// generating something with enough entropy; this layer just persists it.
+func (s *Store) CreateDevice(pid, sn, secret, name string) (*model.Device, error) {
+	d := &model.Device{
+		PID:    pid,
+		SN:     sn,
+		Secret: secret,
+		Name:   name,
+		Status: model.DeviceStatusEnabled,
+		CI:     30,
+		UI:     600,
+	}
+	if err := s.db.Create(d).Error; err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+// DeviceBySN looks up a device by serial number. Every device-facing
+// handler funnels through this, so "not found" and "found but disabled"
+// need to be distinguished by the caller only if it needs to — most
+// callers should treat both as auth failure (see docs §8, code 1103).
+func (s *Store) DeviceBySN(sn string) (*model.Device, error) {
+	var d model.Device
+	if err := s.db.Where("sn = ?", sn).First(&d).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (s *Store) DeviceByID(id uint) (*model.Device, error) {
+	var d model.Device
+	if err := s.db.First(&d, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &d, nil
+}
+
+// ListDevices returns a page of devices ordered newest-first, plus the
+// total row count for pagination.
+func (s *Store) ListDevices(page, pageSize int) ([]model.Device, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	var total int64
+	if err := s.db.Model(&model.Device{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var devices []model.Device
+	err := s.db.Order("id desc").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&devices).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return devices, total, nil
+}
+
+// SetDeviceConfig updates the sampling/upload config and bumps CfgVersion
+// so the next report response includes it (see ProcessReport in
+// telemetry.go, which compares CfgVersion against LastSentCfgVersion).
+func (s *Store) SetDeviceConfig(id uint, ci, ui int, fe []string) error {
+	feJSON, err := json.Marshal(fe)
+	if err != nil {
+		return err
+	}
+	return s.db.Model(&model.Device{}).Where("id = ?", id).Updates(map[string]any{
+		"ci":          ci,
+		"ui":          ui,
+		"fe":          string(feJSON),
+		"cfg_version": gorm.Expr("cfg_version + 1"),
+	}).Error
+}
+
+// SetDeviceStatus enables or disables a device (model.DeviceStatusEnabled /
+// model.DeviceStatusDisabled).
+func (s *Store) SetDeviceStatus(id uint, status int) error {
+	return s.db.Model(&model.Device{}).Where("id = ?", id).Update("status", status).Error
+}
+
+// TouchLastSeen records that a device just successfully reported in.
+func (s *Store) TouchLastSeen(id uint) error {
+	now := time.Now()
+	return s.db.Model(&model.Device{}).Where("id = ?", id).Update("last_seen_at", now).Error
+}
+
+// CheckAndAdvanceActivateTS is the anti-replay guard for the "device
+// already has a local clock" activation path (protocol §4 note): it
+// accepts ts only if it is strictly greater than the last ts recorded for
+// this device, and atomically records it if so. This closes the replay
+// window a bare ±5-minute check leaves open — a captured signed request
+// can't be replayed a second time even within the window, because ts
+// won't have advanced.
+func (s *Store) CheckAndAdvanceActivateTS(deviceID uint, ts int64) (bool, error) {
+	res := s.db.Model(&model.Device{}).
+		Where("id = ? AND last_activate_ts < ?", deviceID, ts).
+		Update("last_activate_ts", ts)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}

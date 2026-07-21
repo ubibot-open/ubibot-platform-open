@@ -1,6 +1,8 @@
-// Package api implements the three device-facing HTTP endpoints defined in
-// docs/UbiBot开放平台硬件通信协议.docx: time sync, activation, and data
-// report with piggybacked config/command delivery.
+// Package api implements the device-facing endpoints defined in
+// docs/UbiBot开放平台硬件通信协议.md (time sync, activation, data report
+// with piggybacked config/command delivery) plus a minimal admin API
+// (login, device list/detail, manual command dispatch) backed by the
+// same persistent store.
 package api
 
 import (
@@ -16,7 +18,6 @@ import (
 type Server struct {
 	Store  *store.Store
 	Nonces *auth.NonceStore
-	Tokens *auth.TokenStore
 	Now    func() time.Time
 }
 
@@ -24,7 +25,6 @@ func NewServer(st *store.Store) *Server {
 	return &Server{
 		Store:  st,
 		Nonces: auth.NewNonceStore(),
-		Tokens: auth.NewTokenStore(),
 		Now:    time.Now,
 	}
 }
