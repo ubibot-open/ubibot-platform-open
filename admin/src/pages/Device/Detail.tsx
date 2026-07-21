@@ -303,6 +303,9 @@ export default function DeviceDetailPage() {
             <Descriptions.Item label="状态">
               {device.status === 1 ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>}
             </Descriptions.Item>
+            <Descriptions.Item label="激活状态">
+              {device.activated ? <Tag color="blue">已激活</Tag> : <Tag color="default">未激活</Tag>}
+            </Descriptions.Item>
             <Descriptions.Item label="在线状态">
               {device.online ? <Tag color="green">在线</Tag> : <Tag color="default">离线</Tag>}
             </Descriptions.Item>

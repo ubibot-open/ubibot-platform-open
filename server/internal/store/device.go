@@ -144,6 +144,15 @@ func (s *Store) SetDeviceStatus(id uint, status int) error {
 	return s.db.Model(&model.Device{}).Where("id = ?", id).Update("status", status).Error
 }
 
+// MarkDeviceActivated records that a device has completed the activation
+// handshake — called once from the /auth/activate handler right after a
+// token is issued. Idempotent and one-way: once a device has activated,
+// it stays "activated" even if its token later expires or it goes quiet,
+// since this tracks activation history, not current session state.
+func (s *Store) MarkDeviceActivated(id uint) error {
+	return s.db.Model(&model.Device{}).Where("id = ? AND activated = ?", id, false).Update("activated", true).Error
+}
+
 // TouchLastSeen records that a device just successfully reported in. now
 // is caller-supplied (see api.Server.Now) rather than time.Now() directly
 // so the online/offline window this feeds (IsDeviceOnline, OfflineSweep)

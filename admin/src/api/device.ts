@@ -6,6 +6,7 @@ export interface Device {
   sn: string
   name: string
   status: number
+  activated: boolean
   online: boolean
   ci: number
   ui: number

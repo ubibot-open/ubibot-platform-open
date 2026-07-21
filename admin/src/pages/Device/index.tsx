@@ -69,6 +69,12 @@ export default function DevicePage() {
         status === 1 ? <Tag color="success">启用</Tag> : <Tag color="default">停用</Tag>,
     },
     {
+      title: '激活状态',
+      dataIndex: 'activated',
+      width: 90,
+      render: (activated: boolean) => (activated ? <Tag color="blue">已激活</Tag> : <Tag color="default">未激活</Tag>),
+    },
+    {
       title: '在线',
       dataIndex: 'online',
       width: 80,

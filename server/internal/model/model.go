@@ -26,6 +26,15 @@ type Device struct {
 	Name   string `gorm:"size:128"`
 	Status int    `gorm:"not null;default:1"`
 
+	// Activated records whether this device has ever completed the
+	// activation handshake (protocol §4) at least once — separate from
+	// Status (enable/disable is an operator decision; Activated is a fact
+	// about the device's own history that, once true, never reverts).
+	// A device that has never activated has never been online, so the
+	// offline-alert sweep (see store.OfflineSweep) skips it rather than
+	// immediately raising an alert for a device that was never up.
+	Activated bool `gorm:"not null;default:false"`
+
 	// Config pushed to the device (protocol §7 cfg block). FE is stored as
 	// a JSON array string; empty means "all sensors enabled".
 	CI int    `gorm:"not null;default:30"`

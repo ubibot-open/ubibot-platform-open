@@ -119,6 +119,10 @@ func (s *Server) Activate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, protocol.CodeServerError, "internal error")
 		return
 	}
+	if err := s.Store.MarkDeviceActivated(dev.ID); err != nil {
+		writeErr(w, protocol.CodeServerError, "internal error")
+		return
+	}
 
 	writeJSON(w, 200, protocol.ActivateResponse{
 		C:     protocol.CodeOK,
@@ -148,6 +152,14 @@ func (s *Server) Report(w http.ResponseWriter, r *http.Request) {
 		return
 	case store.DeviceTokenExpired:
 		writeErr(w, protocol.CodeTokenExpired, "token expired")
+		return
+	}
+	if dev.Status != model.DeviceStatusEnabled {
+		// A disabled device is treated the same as "device not found" to
+		// every device-facing endpoint (see lookupActiveDevice) — a still-
+		// valid token from before it was disabled shouldn't be able to
+		// keep uploading data.
+		writeErr(w, protocol.CodeDeviceNotFound, "device disabled")
 		return
 	}
 
@@ -203,6 +215,10 @@ func (s *Server) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	case store.DeviceTokenExpired:
 		writeErr(w, protocol.CodeTokenExpired, "token expired")
+		return
+	}
+	if dev.Status != model.DeviceStatusEnabled {
+		writeErr(w, protocol.CodeDeviceNotFound, "device disabled")
 		return
 	}
 

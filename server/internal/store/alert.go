@@ -211,9 +211,14 @@ func toFloat(v any) (float64, bool) {
 // receiving one can detect it. Uses the same IsDeviceOnline rule the
 // admin device list/detail view displays, so the alert center and the UI
 // never disagree about which devices are offline.
+//
+// Only devices that have activated at least once are considered — a
+// freshly provisioned device that has never come online yet isn't
+// "offline" in any meaningful sense, so it shouldn't raise an alert the
+// moment it's created (see model.Device.Activated).
 func (s *Store) OfflineSweep(now time.Time) error {
 	var devices []model.Device
-	if err := s.db.Where("status = ?", model.DeviceStatusEnabled).Find(&devices).Error; err != nil {
+	if err := s.db.Where("status = ? AND activated = ?", model.DeviceStatusEnabled, true).Find(&devices).Error; err != nil {
 		return err
 	}
 

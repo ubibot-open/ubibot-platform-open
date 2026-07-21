@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ubibot/ubibot-platform-open/internal/model"
 	"github.com/ubibot/ubibot-platform-open/internal/protocol"
 	"github.com/ubibot/ubibot-platform-open/internal/store"
 )
@@ -33,6 +34,10 @@ func (s *Server) OtaFirmwareDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	case store.DeviceTokenExpired:
 		writeErr(w, protocol.CodeTokenExpired, "token expired")
+		return
+	}
+	if dev.Status != model.DeviceStatusEnabled {
+		writeErr(w, protocol.CodeDeviceNotFound, "device disabled")
 		return
 	}
 

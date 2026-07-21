@@ -34,6 +34,7 @@ type deviceDTO struct {
 	SN         string   `json:"sn"`
 	Name       string   `json:"name"`
 	Status     int      `json:"status"`
+	Activated  bool     `json:"activated"`
 	Online     bool     `json:"online"`
 	CI         int      `json:"ci"`
 	UI         int      `json:"ui"`
@@ -59,6 +60,7 @@ func toDeviceDTO(d *model.Device, now time.Time) deviceDTO {
 		SN:        d.SN,
 		Name:      d.Name,
 		Status:    d.Status,
+		Activated: d.Activated,
 		Online:    store.IsDeviceOnline(d, now),
 		CI:        d.CI,
 		UI:        d.UI,
