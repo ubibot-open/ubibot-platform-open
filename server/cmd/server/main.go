@@ -49,6 +49,15 @@ func main() {
 	srv.FirmwareDir = filepath.Join(dataDir, "firmware")
 	srv.FileDir = filepath.Join(dataDir, "files")
 
+	// See docs §4.1: this keypair lets a self-registration provisioning
+	// tool hand the platform a pre-manufactured device's real secret
+	// without it ever crossing the network unencrypted.
+	keyPair, err := auth.LoadOrCreateServerKeyPair(filepath.Join(dataDir, "keys"))
+	if err != nil {
+		log.Fatalf("load/create server keypair: %v", err)
+	}
+	srv.ServerKeyPair = keyPair
+
 	if err := seedDefaultParams(st); err != nil {
 		log.Fatalf("seed default params: %v", err)
 	}

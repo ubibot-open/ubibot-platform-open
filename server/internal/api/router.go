@@ -66,6 +66,11 @@ func NewRouter(s *Server, ui fs.FS, uiBuilt bool) http.Handler {
 	mux.HandleFunc("POST /api/v1/data/report", withRateLimit(s.RateLimiter, s.Report))
 	mux.HandleFunc("GET /api/v1/device/poll", withRateLimit(s.RateLimiter, s.Poll))
 	mux.HandleFunc("GET /api/v1/ota/firmware", withRateLimit(s.RateLimiter, s.OtaFirmwareDownload))
+	// Self-registration key binding (docs §4.1) — called by a provisioning
+	// tool/app, not the device itself, but still unauthenticated device-
+	// facing surface, so it gets the same IP rate limiter.
+	mux.HandleFunc("GET /api/v1/auth/public-key", withRateLimit(s.RateLimiter, s.PublicKey))
+	mux.HandleFunc("POST /api/v1/auth/bind-key", withRateLimit(s.RateLimiter, s.BindDeviceKey))
 
 	mux.HandleFunc("POST /api/admin/login", s.AdminLogin)
 	mux.HandleFunc("GET /api/admin/me", s.RequireAdmin(s.AdminMe))
@@ -82,12 +87,14 @@ func NewRouter(s *Server, ui fs.FS, uiBuilt bool) http.Handler {
 	mux.HandleFunc("GET /api/admin/devices/{id}/records", s.RequirePermission(model.PermDeviceRead, s.GetDeviceRecords))
 	mux.HandleFunc("PATCH /api/admin/devices/{id}/config", s.RequirePermission(model.PermDeviceWrite, s.UpdateDeviceConfig))
 	mux.HandleFunc("POST /api/admin/devices/{id}/status", s.RequirePermission(model.PermDeviceWrite, s.SetDeviceStatus))
-	// Approve a Pending, self-registered device (model.DeviceSourceSelfRegistered)
-	// -- see api.Activate/api.ApproveDevice. Rejecting one, and disabling/
-	// re-enabling an already-approved device, both reuse the status route
-	// above (POST .../status with DeviceStatusDisabled/Enabled) rather than
-	// needing dedicated endpoints of their own.
-	mux.HandleFunc("POST /api/admin/devices/{id}/approve", s.RequirePermission(model.PermDeviceWrite, s.ApproveDevice))
+	// Admin-facing "设置密钥" for a self-registered device (docs §4.1) —
+	// the manual alternative to the encrypted POST /api/v1/auth/bind-key
+	// flow; setting a secret on a still-Pending device also completes its
+	// activation (see store.SetDeviceSecret). Rejecting a pending device,
+	// and disabling/re-enabling an already-approved one, both reuse the
+	// status route above (POST .../status with DeviceStatusDisabled/
+	// Enabled) rather than needing dedicated endpoints of their own.
+	mux.HandleFunc("POST /api/admin/devices/{id}/secret", s.RequirePermission(model.PermDeviceWrite, s.SetDeviceSecret))
 	mux.HandleFunc("DELETE /api/admin/devices/{id}", s.RequirePermission(model.PermDeviceWrite, s.DeleteDevice))
 
 	// Probe configuration (protocol §7.2 set_probe) rides on device:write —

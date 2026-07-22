@@ -43,25 +43,23 @@ func (s *Server) lookupActiveDevice(sn, pid string) (*model.Device, bool) {
 // maybeAutoRegisterDevice creates a Pending, self-registered device row
 // the first time a completely unrecognized SN attempts to activate — see
 // store.AutoRegisterDevice for why this can't (and doesn't try to)
-// authenticate the caller, and api.ApproveDevice/SetDeviceStatus for how
-// an operator later approves or rejects it from 设备管理. Existing SNs
-// (whether enabled, disabled, or already pending) are left alone — this
-// only fires on true first contact, and only from Activate: TimeSync is
-// just a clock-sync convenience step with nothing to approve, so an
-// unrecognized SN there is simply rejected as always.
+// authenticate the caller (and doesn't generate a secret either — see
+// docs §4.1 for how the real one reaches the platform), and
+// api.SetDeviceStatus/api.SetDeviceSecret for how an operator later
+// rejects or approves it from 设备管理. Existing SNs (whether enabled,
+// disabled, or already pending) are left alone — this only fires on true
+// first contact, and only from Activate: TimeSync is just a clock-sync
+// convenience step with nothing to approve, so an unrecognized SN there is
+// simply rejected as always.
 func (s *Server) maybeAutoRegisterDevice(pid, sn string) {
 	if _, err := s.Store.DeviceBySN(sn); !errors.Is(err, store.ErrNotFound) {
-		return
-	}
-	secret, err := auth.NewDeviceSecret()
-	if err != nil {
 		return
 	}
 	// Errors here (most likely a race with a concurrent duplicate
 	// first-contact request tripping the SN unique index) are swallowed:
 	// either way the caller falls through to the same generic rejection
 	// below, and if a row now exists, that's all this was trying to do.
-	_, _ = s.Store.AutoRegisterDevice(pid, sn, secret)
+	_, _ = s.Store.AutoRegisterDevice(pid, sn)
 }
 
 // TimeSync handles POST /api/v1/auth/time. It validates the device's
@@ -110,11 +108,13 @@ func (s *Server) TimeSync(w http.ResponseWriter, r *http.Request) {
 // so it's never going to succeed here regardless — but before replying
 // with the usual generic rejection, maybeAutoRegisterDevice records the
 // attempt as a Pending, self-registered device (model.DeviceSourceSelfRegistered)
-// so it shows up in 设备管理 for an operator to review. The device itself
-// sees no difference from any other rejected attempt; it's expected to
-// keep retrying until an operator approves it (api.ApproveDevice), at
-// which point the normal signature check above starts applying (once the
-// operator has flashed the auto-generated secret into it).
+// so it shows up in 设备管理 for review. The device itself sees no
+// difference from any other rejected attempt; it's expected to keep
+// retrying until its real secret reaches the platform (docs §4.1's key-
+// binding endpoint, or an operator typing it in via api.SetDeviceSecret),
+// which also flips it to Enabled — at which point the normal signature
+// check above starts succeeding, since the device was signing with that
+// same secret the whole time.
 func (s *Server) Activate(w http.ResponseWriter, r *http.Request) {
 	var req protocol.ActivateRequest
 	if err := decodeJSON(r, &req); err != nil || req.PID == "" || req.SN == "" || req.Sign == "" || req.Ts == 0 {

@@ -24,18 +24,20 @@
     "no": "离线"
   },
   "status": {
-    "pending": "待审批"
+    "pending": "已激活，待确认"
   },
   "source": {
     "title": "来源",
     "manual": "手动添加",
     "selfRegistered": "自主激活"
   },
-  "approveButton": "允许",
-  "approveConfirmTitle": "允许该设备激活",
-  "approveSuccess": "已允许激活",
-  "approveFailed": "操作失败",
-  "approvedNotice": "已允许该设备激活。设备密钥只会显示这一次，请立即记录并烧录到设备中：",
+  "setSecretButton": "设置密钥",
+  "setSecretNotice": "自主激活的设备没有预置密钥，请通过专用工具/App从设备读取真实密钥后填入。若该设备当前处于待确认状态，设置密钥后将自动完成激活。",
+  "setSecretLabel": "设备密钥",
+  "setSecretPlaceholder": "请输入从设备读取到的真实密钥",
+  "setSecretSubmit": "保存",
+  "setSecretSuccess": "密钥设置成功",
+  "setSecretFailed": "密钥设置失败",
   "rejectButton": "禁止",
   "rejectConfirmTitle": "确认禁止该设备激活？禁止后将不再处理该设备的任何数据。",
   "rejectSuccess": "已禁止",

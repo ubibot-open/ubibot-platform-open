@@ -7,10 +7,10 @@ import { useTranslation } from 'react-i18next'
 import {
   DeviceSource,
   DeviceStatus,
-  approveDevice,
   createDevice,
   deleteDevice,
   listDevices,
+  setDeviceSecret,
   setDeviceStatus,
   type Device,
 } from '../../api/device'
@@ -26,9 +26,11 @@ export default function DevicePage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
-  const [approvedSecret, setApprovedSecret] = useState<string | null>(null)
+  const [secretModalId, setSecretModalId] = useState<number | null>(null)
+  const [settingSecret, setSettingSecret] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [form] = Form.useForm()
+  const [secretForm] = Form.useForm()
 
   function formatTime(ts: number | null) {
     if (!ts) return t('neverReported')
@@ -69,17 +71,19 @@ export default function DevicePage() {
     }
   }
 
-  const onApprove = async (id: number) => {
-    setBusyId(id)
+  const onSetSecret = async (values: { secret: string }) => {
+    if (secretModalId === null) return
+    setSettingSecret(true)
     try {
-      const dev = await approveDevice(id)
-      message.success(t('approveSuccess'))
-      setApprovedSecret(dev.secret ?? null)
+      await setDeviceSecret(secretModalId, values.secret)
+      message.success(t('setSecretSuccess'))
+      setSecretModalId(null)
+      secretForm.resetFields()
       load()
     } catch (e) {
-      message.error(apiErrorMessage(e, t('approveFailed')))
+      message.error(apiErrorMessage(e, t('setSecretFailed')))
     } finally {
-      setBusyId(null)
+      setSettingSecret(false)
     }
   }
 
@@ -154,7 +158,7 @@ export default function DevicePage() {
     {
       title: t('columns.status'),
       dataIndex: 'status',
-      width: 100,
+      width: 120,
       render: (status: number) => {
         if (status === DeviceStatus.Pending) return <Tag color="gold">{t('status.pending')}</Tag>
         return status === DeviceStatus.Enabled ? (
@@ -186,19 +190,17 @@ export default function DevicePage() {
     { title: t('columns.lastSeen'), dataIndex: 'last_seen_at', render: formatTime },
     {
       title: t('columns.actions'),
-      width: 220,
+      width: 260,
       render: (_, r) => (
         <Space size="small" wrap>
           <a onClick={() => navigate(`/device/${r.id}`)}>{t('detail')}</a>
+          {r.source === DeviceSource.SelfRegistered && (
+            <a onClick={() => setSecretModalId(r.id)}>{t('setSecretButton')}</a>
+          )}
           {r.status === DeviceStatus.Pending && (
-            <>
-              <Popconfirm title={t('approveConfirmTitle')} onConfirm={() => onApprove(r.id)}>
-                <a>{t('approveButton')}</a>
-              </Popconfirm>
-              <Popconfirm title={t('rejectConfirmTitle')} onConfirm={() => onReject(r.id)}>
-                <a style={{ color: '#ff4d4f' }}>{t('rejectButton')}</a>
-              </Popconfirm>
-            </>
+            <Popconfirm title={t('rejectConfirmTitle')} onConfirm={() => onReject(r.id)}>
+              <a style={{ color: '#ff4d4f' }}>{t('rejectButton')}</a>
+            </Popconfirm>
           )}
           {r.status === DeviceStatus.Enabled && (
             <Popconfirm title={t('disableConfirmTitle')} onConfirm={() => onDisable(r.id)}>
@@ -290,20 +292,26 @@ export default function DevicePage() {
       </Modal>
 
       <Modal
-        title={t('approveConfirmTitle')}
-        open={approvedSecret !== null}
-        onCancel={() => setApprovedSecret(null)}
-        footer={
-          <Button type="primary" onClick={() => setApprovedSecret(null)}>
-            {t('create.gotIt')}
-          </Button>
-        }
+        title={t('setSecretButton')}
+        open={secretModalId !== null}
+        onCancel={() => setSecretModalId(null)}
+        footer={null}
         destroyOnClose
       >
-        <Typography.Paragraph>{t('approvedNotice')}</Typography.Paragraph>
-        <Typography.Text code copyable style={{ fontSize: 14 }}>
-          {approvedSecret}
-        </Typography.Text>
+        <Typography.Paragraph>{t('setSecretNotice')}</Typography.Paragraph>
+        <Form form={secretForm} layout="vertical" onFinish={onSetSecret}>
+          <Form.Item name="secret" label={t('setSecretLabel')} rules={[{ required: true }]}>
+            <Input placeholder={t('setSecretPlaceholder')} />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setSecretModalId(null)}>{t('common:cancel')}</Button>
+              <Button type="primary" htmlType="submit" loading={settingSecret}>
+                {t('setSecretSubmit')}
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )

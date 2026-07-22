@@ -24,18 +24,20 @@
     "no": "オフライン"
   },
   "status": {
-    "pending": "承認待ち"
+    "pending": "有効化済み・確認待ち"
   },
   "source": {
     "title": "ソース",
     "manual": "手動追加",
     "selfRegistered": "自己登録"
   },
-  "approveButton": "許可",
-  "approveConfirmTitle": "このデバイスの有効化を許可",
-  "approveSuccess": "有効化を許可しました",
-  "approveFailed": "操作に失敗しました",
-  "approvedNotice": "このデバイスの有効化を許可しました。デバイスシークレットはこの一度だけ表示されます。必ず記録し、デバイスに書き込んでください：",
+  "setSecretButton": "鍵を設定",
+  "setSecretNotice": "自己登録デバイスには事前設定された鍵がありません。専用ツール/アプリでデバイスから実際の鍵を読み取り、ここに入力してください。このデバイスが現在「確認待ち」状態の場合、鍵を設定すると自動的に有効化が完了します。",
+  "setSecretLabel": "デバイスシークレット",
+  "setSecretPlaceholder": "デバイスから読み取った実際の鍵を入力",
+  "setSecretSubmit": "保存",
+  "setSecretSuccess": "鍵を設定しました",
+  "setSecretFailed": "鍵の設定に失敗しました",
   "rejectButton": "拒否",
   "rejectConfirmTitle": "このデバイスを拒否しますか？拒否するとこのデバイスのデータは一切処理されなくなります。",
   "rejectSuccess": "拒否しました",

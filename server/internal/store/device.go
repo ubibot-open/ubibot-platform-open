@@ -73,18 +73,20 @@ func (s *Store) CreateDevice(pid, sn, secret, name string) (*model.Device, error
 
 // AutoRegisterDevice creates a Pending, self-registered Device row the
 // moment an SN the platform has never seen tries to activate (see
-// api.Activate). There is no secret on file to check that attempt's
-// signature against, so this can't (and doesn't try to) authenticate the
-// caller — it only makes the attempt visible in 设备管理 for an operator to
-// review. secret is a freshly generated random value (see
-// internal/auth.NewDeviceSecret, same as CreateDevice); nothing about this
-// device can send or receive real data until ApproveDevice flips its
-// status to Enabled and an operator flashes that secret into it.
-func (s *Store) AutoRegisterDevice(pid, sn, secret string) (*model.Device, error) {
+// api.Activate). Secret is left empty rather than generated: this is a
+// pre-manufactured device with its own factory-set secret already baked
+// in, and there is no way to tell it "actually, use this one instead" —
+// generating one server-side here would just be a secret the physical
+// device can never be told about. It only makes the attempt visible in
+// 设备管理 for an operator to review. Nothing about this device can send or
+// receive real data until its real secret reaches the platform (docs
+// §4.1's key-binding endpoint, or the admin-facing SetDeviceSecret) and
+// that flips it to Enabled.
+func (s *Store) AutoRegisterDevice(pid, sn string) (*model.Device, error) {
 	d := &model.Device{
 		PID:    pid,
 		SN:     sn,
-		Secret: secret,
+		Secret: "",
 		Status: model.DeviceStatusPending,
 		Source: model.DeviceSourceSelfRegistered,
 		CI:     30,
@@ -124,18 +126,31 @@ func (s *Store) DeleteDevice(id uint) error {
 	})
 }
 
-// ApproveDevice moves a Pending self-registered device to Enabled — the
-// operator's decision to let it join. Only meaningful for a device
-// currently Pending; ok is false (no error, no-op) if it wasn't, so
-// callers can tell "nothing to approve" apart from a real DB error.
-func (s *Store) ApproveDevice(id uint) (ok bool, err error) {
-	res := s.db.Model(&model.Device{}).
-		Where("id = ? AND status = ?", id, model.DeviceStatusPending).
-		Update("status", model.DeviceStatusEnabled)
-	if res.Error != nil {
-		return false, res.Error
+// SetDeviceSecret records a device's real secret — used by both the
+// device-facing key-binding endpoint (api.BindDeviceKey, docs §4.1) and
+// the admin-facing "设置密钥" action (api.SetDeviceSecret), the two ways a
+// self-registered device's factory-set secret can reach the platform
+// after AutoRegisterDevice created it with none. If the device is still
+// Pending, this also completes its activation (Pending -> Enabled) in the
+// same call — knowing its real secret is the only thing approval was ever
+// gating on. A device that isn't Pending (already enabled, disabled, or
+// manually created) just gets its secret updated in place, status
+// untouched — e.g. correcting a wrong key doesn't silently re-enable a
+// device an operator deliberately disabled.
+func (s *Store) SetDeviceSecret(id uint, secret string) error {
+	var dev model.Device
+	if err := s.db.Select("id", "status").First(&dev, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return err
 	}
-	return res.RowsAffected > 0, nil
+
+	updates := map[string]any{"secret": secret}
+	if dev.Status == model.DeviceStatusPending {
+		updates["status"] = model.DeviceStatusEnabled
+	}
+	return s.db.Model(&model.Device{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // DeviceBySN looks up a device by serial number. Every device-facing

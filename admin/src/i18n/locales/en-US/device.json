@@ -24,18 +24,20 @@
     "no": "Offline"
   },
   "status": {
-    "pending": "Pending Approval"
+    "pending": "Activated, Pending Confirmation"
   },
   "source": {
     "title": "Source",
     "manual": "Manually Added",
     "selfRegistered": "Self-Registered"
   },
-  "approveButton": "Approve",
-  "approveConfirmTitle": "Approve this device",
-  "approveSuccess": "Approved",
-  "approveFailed": "Action failed",
-  "approvedNotice": "This device has been approved. The device secret is shown only once — record it and flash it to the device immediately:",
+  "setSecretButton": "Set Secret",
+  "setSecretNotice": "A self-registered device has no pre-set secret. Use a dedicated tool/app to read its real secret off the device, then enter it here. If this device is currently Pending Confirmation, setting its secret also completes its activation.",
+  "setSecretLabel": "Device Secret",
+  "setSecretPlaceholder": "Enter the real secret read from the device",
+  "setSecretSubmit": "Save",
+  "setSecretSuccess": "Secret set successfully",
+  "setSecretFailed": "Failed to set secret",
   "rejectButton": "Reject",
   "rejectConfirmTitle": "Reject this device? Once rejected, no data from it will be processed at all.",
   "rejectSuccess": "Rejected",

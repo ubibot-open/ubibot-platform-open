@@ -11,11 +11,11 @@ import "time"
 // which serials exist. Pending is the extra state a self-registered device
 // (see DeviceSourceSelfRegistered) starts in: it also fails every
 // device-facing endpoint's Status == Enabled check exactly like Disabled
-// does, so an unapproved device can't send or receive any data either —
-// the only difference from Disabled is that an operator can still approve
-// it forward into Enabled (see store.ApproveDevice via api.ApproveDevice),
-// which also surfaces its auto-generated secret once so it can be flashed
-// into the physical device.
+// does, so an unconfirmed device can't send or receive any data either —
+// the only difference from Disabled is that it's expected to advance to
+// Enabled on its own once its real secret reaches the platform (docs §4.1
+// key binding, or the admin-facing SetDeviceSecret — see store.SetDeviceSecret),
+// rather than needing an explicit operator decision the way Disabled does.
 const (
 	DeviceStatusEnabled  = 1
 	DeviceStatusDisabled = 2
@@ -23,14 +23,19 @@ const (
 )
 
 // Device source channels: a manually-provisioned device is created ahead
-// of time by an operator via 设备管理 (see api.CreateDevice), who is handed
-// its secret to flash into the device out of band. A self-registered
-// device instead shows up on its own — its SN wasn't in this platform's
+// of time by an operator via 设备管理 (see api.CreateDevice) for a newly
+// manufactured unit — the platform generates its secret and the operator
+// flashes that exact value into the device before it ever ships, so
+// connecting for the first time activates immediately. A self-registered
+// device instead shows up on its own: its SN wasn't in this platform's
 // database yet when it tried to activate, so the server auto-created a
-// Pending row for it (see api.Activate / store.AutoRegisterDevice) with a
-// randomly generated secret nobody has told the physical device yet; an
-// operator must review and approve it (copying that secret over) before
-// it can do anything.
+// Pending row for it with no secret at all (see api.Activate /
+// store.AutoRegisterDevice) — this covers a pre-manufactured device whose
+// factory-set secret the platform was never told. That secret still has
+// to reach the platform somehow before the device can do anything; see
+// docs §4.1 for the two ways that happens (an encrypted key-binding
+// submission from a provisioning tool, or an operator typing it in
+// directly via SetDeviceSecret).
 const (
 	DeviceSourceManual         = "manual"
 	DeviceSourceSelfRegistered = "self_registered"

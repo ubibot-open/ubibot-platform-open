@@ -8,6 +8,7 @@ const (
 	CodeOK             = 0
 	CodeSignMismatch   = 1002 // bad signature, invalid/used nonce, or timestamp out of window / not advancing
 	CodeMalformedBody  = 1003
+	CodeKeyBindFailed  = 1104 // bind-key: sn not found/not eligible, or ciphertext didn't decrypt (docs §4.1)
 	CodeTokenInvalid   = 1101
 	CodeTokenExpired   = 1102
 	CodeDeviceNotFound = 1103
@@ -116,6 +117,35 @@ type ReportResponse struct {
 	Cmd []CmdItem `json:"cmd,omitempty"`
 }
 
+// PublicKeyResponse is GET /api/v1/auth/public-key's reply (docs §4.1) —
+// the provisioning-tool-facing half of self-registration key binding.
+// PublicKeyPEM is this platform instance's RSA-2048 public key, PKCS#1
+// PEM-encoded; a provisioning tool fetches it once and encrypts a
+// self-registered device's real secret against it before submitting that
+// secret via BindKeyRequest.
+type PublicKeyResponse struct {
+	C            int    `json:"c"`
+	PublicKeyPEM string `json:"public_key_pem"`
+}
+
+// BindKeyRequest is POST /api/v1/auth/bind-key (docs §4.1): a provisioning
+// tool submits a self-registered device's real secret — read directly off
+// the hardware over serial or Bluetooth, since a pre-manufactured device
+// can never be told a secret the platform generated after the fact — so
+// the platform can finally record it and complete that device's
+// activation. Secret is base64(RSA-OAEP-SHA256(PublicKeyPEM, rawSecret)),
+// never the raw secret itself.
+type BindKeyRequest struct {
+	SN     string `json:"sn" binding:"required"`
+	Secret string `json:"secret" binding:"required"`
+}
+
+// BindKeyResponse acknowledges a successful key bind.
+type BindKeyResponse struct {
+	C int    `json:"c"`
+	M string `json:"m"`
+}
+
 // ErrorResponse is the generic error envelope for every endpoint.
 type ErrorResponse struct {
 	C int    `json:"c"`
@@ -128,7 +158,7 @@ func HTTPStatusFor(code int) int {
 	switch code {
 	case CodeOK:
 		return 200
-	case CodeSignMismatch, CodeMalformedBody:
+	case CodeSignMismatch, CodeMalformedBody, CodeKeyBindFailed:
 		return 400
 	case CodeTokenInvalid, CodeTokenExpired, CodeDeviceNotFound:
 		return 401

@@ -36,7 +36,8 @@ export const DeviceStatus = {
   Disabled: 2,
   // A self-registered device the platform hasn't approved yet (see
   // DeviceSource.SelfRegistered) -- blocked from sending/receiving any
-  // data exactly like Disabled, until an operator calls approveDevice.
+  // data exactly like Disabled, until its secret is set (setDeviceSecret)
+  // and it advances to Enabled.
   Pending: 3,
 } as const
 
@@ -80,12 +81,14 @@ export function setDeviceStatus(id: number, status: number) {
   return api.post<{ message: string }>(`/api/admin/devices/${id}/status`, { status })
 }
 
-// approveDevice moves a Pending self-registered device to Enabled and
-// returns it with its secret populated -- the only other place besides
-// createDevice a secret is ever shown back, so the caller can flash it
-// into the physical device now (see server's ApproveDevice handler).
-export function approveDevice(id: number) {
-  return api.post<Device>(`/api/admin/devices/${id}/approve`, {})
+// setDeviceSecret is the admin-facing "设置密钥" action for a self-registered
+// device (docs §4.1): a self-registered device is auto-created with no
+// secret at all (there's no way to tell a pre-manufactured device one the
+// platform picked), so an operator who was told its real secret types it
+// in here. If the device was still Pending, this also completes its
+// activation.
+export function setDeviceSecret(id: number, secret: string) {
+  return api.post<Device>(`/api/admin/devices/${id}/secret`, { secret })
 }
 
 // deleteDevice permanently removes the device and all of its associated

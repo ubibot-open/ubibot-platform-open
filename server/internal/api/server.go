@@ -27,6 +27,14 @@ type Server struct {
 	FileDir     string
 	DBPath      string
 	StartedAt   time.Time
+
+	// ServerKeyPair is this platform instance's RSA keypair (docs §4.1) —
+	// a self-registration provisioning tool encrypts a device's real
+	// secret against its public half before submitting it to
+	// POST /api/v1/auth/bind-key; only this process's private half can
+	// decrypt it back (see PublicKey/BindDeviceKey). Nil is a valid zero
+	// value for tests that don't exercise that endpoint.
+	ServerKeyPair *auth.KeyPairPEM
 }
 
 // DefaultRateLimitPerMinute is how many device-facing requests a single

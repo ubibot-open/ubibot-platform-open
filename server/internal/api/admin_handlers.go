@@ -42,7 +42,7 @@ type deviceDTO struct {
 	FE         []string `json:"fe"`
 	LastSeenAt *int64   `json:"last_seen_at"`
 	CreatedAt  int64    `json:"created_at"`
-	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice/ApproveDevice
+	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice
 }
 
 // toDeviceDTO's Online field uses the same rule (store.IsDeviceOnline) the
@@ -368,50 +368,48 @@ func (s *Server) SetDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"message": "ok"})
 }
 
-// ApproveDevice handles POST /api/admin/devices/{id}/approve — the
-// operator's decision to let a self-registered (Pending) device join (see
-// model.DeviceSourceSelfRegistered, api.Activate). This is the only other
-// place besides CreateDevice a device's secret is ever shown back: the
-// auto-registration that created this row picked a random one with no way
-// to tell the operator what it is out of band, so this response carries it
-// once so it can be copied into the physical device, the same "write it
-// down now" convention CreateDevice uses.
-func (s *Server) ApproveDevice(w http.ResponseWriter, r *http.Request) {
+type setDeviceSecretRequest struct {
+	Secret string `json:"secret"`
+}
+
+// SetDeviceSecret handles POST /api/admin/devices/{id}/secret — the
+// admin-facing "设置密钥" action (docs §4.1). A self-registered device (see
+// model.DeviceSourceSelfRegistered) is auto-created with no secret at all,
+// since there is no way to tell a pre-manufactured device a secret the
+// platform picked; an operator who was told (or read off a provisioning
+// tool's screen) that device's real, factory-set secret can type it in
+// here directly instead of going through the encrypted key-binding
+// endpoint (see BindDeviceKey). If the device was still Pending, this also
+// completes its activation (see store.SetDeviceSecret).
+func (s *Server) SetDeviceSecret(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		adminErr(w, 400, "invalid id")
 		return
 	}
 
-	ok, err := s.Store.ApproveDevice(uint(id))
-	if err != nil {
-		adminErr(w, 500, "internal error")
+	var req setDeviceSecretRequest
+	if err := decodeJSON(r, &req); err != nil || req.Secret == "" {
+		adminErr(w, 400, "secret is required")
 		return
 	}
-	if !ok {
-		// Either the device doesn't exist, or it exists but isn't Pending
-		// (already approved, disabled, or manually created) — distinguish
-		// those only to pick a sensible status code, not because either
-		// response reveals anything new.
-		if _, err := s.Store.DeviceByID(uint(id)); errors.Is(err, store.ErrNotFound) {
+
+	if err := s.Store.SetDeviceSecret(uint(id), req.Secret); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
 			adminErr(w, 404, "device not found")
 		} else {
-			adminErr(w, 400, "device is not pending approval")
+			adminErr(w, 500, "internal error")
 		}
 		return
 	}
+	s.audit(r, "device.set_secret", "device", uint(id), "")
 
 	dev, err := s.Store.DeviceByID(uint(id))
 	if err != nil {
 		adminErr(w, 500, "internal error")
 		return
 	}
-
-	s.audit(r, "device.approve", "device", dev.ID, dev.SN)
-
-	dto := toDeviceDTO(dev, s.Now())
-	dto.Secret = dev.Secret
-	writeJSON(w, 200, dto)
+	writeJSON(w, 200, toDeviceDTO(dev, s.Now()))
 }
 
 // DeleteDevice handles DELETE /api/admin/devices/{id} — permanently
