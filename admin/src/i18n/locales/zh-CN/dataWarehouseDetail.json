@@ -1,0 +1,36 @@
+{
+  "backToList": "返回列表",
+  "loadFailed": "加载设备详情失败",
+  "tabs": {
+    "dashboard": "仪表盘",
+    "history": "历史图表"
+  },
+  "status": {
+    "alert": "设备告警中",
+    "offline": "设备离线",
+    "normal": "设备正常",
+    "openAlertsCount": "{{count}} 个未处理告警"
+  },
+  "info": {
+    "title": "设备详情",
+    "status": "状态",
+    "activated": "激活状态",
+    "online": "在线状态",
+    "interval": "采集/上报间隔",
+    "seconds": "秒",
+    "createdAt": "创建时间",
+    "lastSeen": "最近上报"
+  },
+  "sensors": {
+    "title": "传感器详情",
+    "noData": "暂无传感器数据"
+  },
+  "history": {
+    "loadFailed": "加载历史数据失败",
+    "fieldsPlaceholder": "选择要查看的传感器字段",
+    "exportButton": "导出CSV",
+    "truncatedNotice": "当前时间范围内数据较多，仅显示前 {{limit}} 条，可缩小时间范围查看更多",
+    "noFields": "请选择要查看的传感器字段",
+    "noData": "该时间范围内没有数据"
+  }
+}

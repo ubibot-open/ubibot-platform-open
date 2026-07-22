@@ -10,6 +10,7 @@ import DashboardPage from './pages/Dashboard'
 import DevicePage from './pages/Device'
 import DeviceDetailPage from './pages/Device/Detail'
 import DataWarehousePage from './pages/DataWarehouse'
+import DataWarehouseDeviceDetailPage from './pages/DataWarehouse/DeviceDetail'
 import MonitorPage from './pages/Monitor'
 import CommandPage from './pages/Command'
 import AlertPage from './pages/Alert'
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/device" element={<DevicePage />} />
               <Route path="/device/:id" element={<DeviceDetailPage />} />
               <Route path="/data-warehouse" element={<DataWarehousePage />} />
+              <Route path="/data-warehouse/:id" element={<DataWarehouseDeviceDetailPage />} />
               <Route path="/monitor" element={<MonitorPage />} />
               <Route path="/command" element={<CommandPage />} />
               <Route path="/alert" element={<AlertPage />} />

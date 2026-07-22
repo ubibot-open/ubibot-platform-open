@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Avatar,
   Button,
@@ -17,35 +18,21 @@ import {
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
 import { AppstoreOutlined, DownloadOutlined, HddOutlined, SearchOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { listDataWarehouse, type DataWarehouseItem } from '../../api/device'
 import { apiErrorMessage } from '../../api/errors'
 import { useFieldIcons } from '../../hooks/useFieldIcons'
-
-// fromNow() picks up dayjs's global locale, which useAntdLocale keeps in
-// sync with the current UI language -- so this relabels itself on language
-// switch without any extra wiring here.
-dayjs.extend(relativeTime)
-
-function formatFieldValue(v: unknown): string {
-  if (v === null || v === undefined) return '-'
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2)
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
-}
-
-function csvCell(v: unknown): string {
-  return `"${String(v).replace(/"/g, '""')}"`
-}
+import { formatFieldValue } from '../../utils/sensorValue'
+import { toCsv, downloadCsv } from '../../utils/csv'
+import RelativeTime from '../../components/RelativeTime'
 
 type OnlineFilter = 'all' | 'online' | 'offline'
 
 export default function DataWarehousePage() {
   const { t } = useTranslation('dataWarehouse')
   const { renderFieldIcon, fieldColor } = useFieldIcons()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<DataWarehouseItem[]>([])
   const [total, setTotal] = useState(0)
@@ -83,15 +70,6 @@ export default function DataWarehousePage() {
     return true
   })
 
-  // Shows "3 minutes ago" / "2 hours ago" etc. at a glance; the exact
-  // timestamp is one hover away via the tooltip rather than cluttering the
-  // list -- matches how last_seen_at is scanned in practice (recent vs.
-  // stale), not looked up as an exact value.
-  function renderLastSeen(ts: number | null) {
-    if (!ts) return <span>{t('neverReported')}</span>
-    return <Tooltip title={new Date(ts * 1000).toLocaleString()}>{dayjs(ts * 1000).fromNow()}</Tooltip>
-  }
-
   const onExport = () => {
     const fieldKeys = Array.from(
       new Set(filtered.flatMap((it) => (it.last_record ? Object.keys(it.last_record.d) : []))),
@@ -107,14 +85,7 @@ export default function DataWarehousePage() {
       new Date(it.created_at * 1000).toISOString(),
       ...fieldKeys.map((k) => formatFieldValue(it.last_record?.d[k])),
     ])
-    const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `data-warehouse-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(`data-warehouse-${new Date().toISOString().slice(0, 10)}.csv`, toCsv([header, ...rows]))
   }
 
   function renderSensorTags(item: DataWarehouseItem) {
@@ -148,7 +119,10 @@ export default function DataWarehousePage() {
     {
       title: t('columns.device'),
       render: (_, r) => (
-        <Space>
+        <Space
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate(`/data-warehouse/${r.id}`)}
+        >
           <Avatar icon={<HddOutlined />} />
           <div>
             <div>{r.name || r.sn}</div>
@@ -166,7 +140,11 @@ export default function DataWarehousePage() {
         r.online ? <Tag color="green">{t('online.yes')}</Tag> : <Tag color="default">{t('online.no')}</Tag>,
     },
     { title: t('columns.sensorData'), render: (_, r) => renderSensorTags(r) },
-    { title: t('columns.lastSeen'), width: 160, render: (_, r) => renderLastSeen(r.last_seen_at) },
+    {
+      title: t('columns.lastSeen'),
+      width: 160,
+      render: (_, r) => <RelativeTime ts={r.last_seen_at} fallback={t('neverReported')} />,
+    },
     {
       title: t('columns.createdAt'),
       width: 180,
@@ -230,6 +208,8 @@ export default function DataWarehousePage() {
               <Col key={it.id} xs={24} sm={12} md={8} lg={6}>
                 <Card
                   size="small"
+                  hoverable
+                  onClick={() => navigate(`/data-warehouse/${it.id}`)}
                   title={
                     <Space>
                       <Avatar icon={<HddOutlined />} size="small" />
@@ -254,7 +234,7 @@ export default function DataWarehousePage() {
                   </Space>
                   <div style={{ marginBottom: 8 }}>{renderSensorTags(it)}</div>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {t('columns.lastSeen')}: {renderLastSeen(it.last_seen_at)}
+                    {t('columns.lastSeen')}: <RelativeTime ts={it.last_seen_at} fallback={t('neverReported')} />
                   </Typography.Text>
                 </Card>
               </Col>

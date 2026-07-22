@@ -1,0 +1,36 @@
+{
+  "backToList": "Back to List",
+  "loadFailed": "Failed to load device details",
+  "tabs": {
+    "dashboard": "Dashboard",
+    "history": "History Charts"
+  },
+  "status": {
+    "alert": "Alerting",
+    "offline": "Offline",
+    "normal": "Normal",
+    "openAlertsCount": "{{count}} open alert(s)"
+  },
+  "info": {
+    "title": "Device Info",
+    "status": "Status",
+    "activated": "Activated",
+    "online": "Online",
+    "interval": "Sample / Upload Interval",
+    "seconds": "s",
+    "createdAt": "Created At",
+    "lastSeen": "Last Seen"
+  },
+  "sensors": {
+    "title": "Sensor Details",
+    "noData": "No sensor data"
+  },
+  "history": {
+    "loadFailed": "Failed to load history data",
+    "fieldsPlaceholder": "Select sensor fields to view",
+    "exportButton": "Export CSV",
+    "truncatedNotice": "There's a lot of data in this range -- showing only the first {{limit}} records. Narrow the time range to see more.",
+    "noFields": "Select at least one sensor field to view",
+    "noData": "No data in this time range"
+  }
+}
