@@ -1,6 +1,8 @@
 {
   "dashboard": "ダッシュボード",
-  "device": "デバイス管理",
+  "deviceManagement": "デバイス管理",
+  "device": "デバイス一覧",
+  "dataWarehouse": "データウェアハウス",
   "monitor": "データモニタ",
   "command": "コマンド送信",
   "alert": "アラートセンター",
@@ -15,6 +17,7 @@
     "files": "ファイル管理",
     "dict": "辞書管理",
     "params": "システムパラメータ",
-    "monitor": "システム監視"
+    "monitor": "システム監視",
+    "icons": "アイコンライブラリ"
   }
 }

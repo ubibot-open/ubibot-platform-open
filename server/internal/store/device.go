@@ -122,6 +122,38 @@ func (s *Store) ListDevices(page, pageSize int) ([]model.Device, int64, error) {
 	return devices, total, nil
 }
 
+// ListActivatedDevices is like ListDevices but restricted to devices that
+// have completed activation (model.Device.Activated) — backing the "数据仓库"
+// (data warehouse) view, which is about telemetry and only makes sense for
+// devices that have actually gone through the activation handshake and can
+// have data. A never-activated device is still visible in ListDevices
+// (device management covers provisioning too), just not here.
+func (s *Store) ListActivatedDevices(page, pageSize int) ([]model.Device, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	q := s.db.Model(&model.Device{}).Where("activated = ?", true)
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var devices []model.Device
+	err := q.Order("id desc").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&devices).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return devices, total, nil
+}
+
 // SetDeviceConfig updates the sampling/upload config and bumps CfgVersion
 // so the next report response includes it (see ProcessReport in
 // telemetry.go, which compares CfgVersion against LastSentCfgVersion).

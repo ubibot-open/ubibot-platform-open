@@ -32,6 +32,34 @@ func (s *Store) SaveRecords(deviceID uint, recs []protocol.Record) error {
 	return s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error
 }
 
+// LatestRecordsByDevice returns, for each ID in deviceIDs that has at least
+// one stored record, only that device's single most recent DeviceRecord —
+// one query instead of len(deviceIDs) separate ones, via a window function
+// over the existing (device_id, ts) index. Backs the "数据仓库" list's
+// per-row sensor-data preview.
+func (s *Store) LatestRecordsByDevice(deviceIDs []uint) (map[uint]model.DeviceRecord, error) {
+	result := make(map[uint]model.DeviceRecord, len(deviceIDs))
+	if len(deviceIDs) == 0 {
+		return result, nil
+	}
+
+	var rows []model.DeviceRecord
+	err := s.db.Raw(`
+		SELECT id, device_id, ts, data, created_at FROM (
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY ts DESC) AS rn
+			FROM device_records
+			WHERE device_id IN ?
+		) WHERE rn = 1
+	`, deviceIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		result[r.DeviceID] = r
+	}
+	return result, nil
+}
+
 // RecentRecords returns a device's most recent telemetry, newest first —
 // used by the admin device-detail page's "最近上报数据" panel.
 func (s *Store) RecentRecords(deviceID uint, limit int) ([]model.DeviceRecord, error) {

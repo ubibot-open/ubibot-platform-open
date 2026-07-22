@@ -1,0 +1,40 @@
+{
+  "title": "Data Warehouse",
+  "subtitle": "{{count}} activated device(s), showing each device's latest reported sensor data",
+  "loadFailed": "Failed to load data warehouse",
+  "neverReported": "Never reported",
+  "noData": "No data",
+  "searchPlaceholder": "Search by device name or SN",
+  "exportButton": "Export CSV",
+  "filters": {
+    "all": "All"
+  },
+  "columns": {
+    "device": "Device",
+    "status": "Status",
+    "sensorData": "Sensor Data",
+    "lastSeen": "Last Seen",
+    "createdAt": "Created At"
+  },
+  "online": {
+    "yes": "Online",
+    "no": "Offline"
+  },
+  "activated": {
+    "yes": "Activated",
+    "no": "Not Activated"
+  },
+  "fields": {
+    "temperature": "Temperature",
+    "humidity": "Humidity",
+    "light": "Light",
+    "battery": "Battery",
+    "voltage": "Voltage",
+    "rssi": "Signal Strength",
+    "signal": "Signal Strength",
+    "wifi": "WiFi",
+    "interface": "Power Source",
+    "co2": "CO₂ Level",
+    "pressure": "Pressure"
+  }
+}

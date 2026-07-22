@@ -1,6 +1,8 @@
 {
   "dashboard": "Dashboard",
+  "deviceManagement": "Device Management",
   "device": "Devices",
+  "dataWarehouse": "Data Warehouse",
   "monitor": "Data Monitor",
   "command": "Commands",
   "alert": "Alert Center",
@@ -15,6 +17,7 @@
     "files": "Files",
     "dict": "Dictionaries",
     "params": "System Params",
-    "monitor": "System Monitor"
+    "monitor": "System Monitor",
+    "icons": "Icon Library"
   }
 }

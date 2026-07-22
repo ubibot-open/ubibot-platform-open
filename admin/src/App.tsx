@@ -9,6 +9,7 @@ import LoginPage from './pages/Login'
 import DashboardPage from './pages/Dashboard'
 import DevicePage from './pages/Device'
 import DeviceDetailPage from './pages/Device/Detail'
+import DataWarehousePage from './pages/DataWarehouse'
 import MonitorPage from './pages/Monitor'
 import CommandPage from './pages/Command'
 import AlertPage from './pages/Alert'
@@ -22,6 +23,7 @@ import FilesPage from './pages/System/Files'
 import DictPage from './pages/System/Dict'
 import ParamsPage from './pages/System/Params'
 import SystemMonitorPage from './pages/System/Monitor'
+import IconLibraryPage from './pages/System/IconLibrary'
 
 export default function App() {
   const { mode } = useThemeMode()
@@ -50,11 +52,13 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/device" element={<DevicePage />} />
               <Route path="/device/:id" element={<DeviceDetailPage />} />
+              <Route path="/data-warehouse" element={<DataWarehousePage />} />
               <Route path="/monitor" element={<MonitorPage />} />
               <Route path="/command" element={<CommandPage />} />
               <Route path="/alert" element={<AlertPage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/firmware" element={<FirmwarePage />} />
+              <Route path="/device-management" element={<Navigate to="/device" replace />} />
               <Route path="/system/admin" element={<AdminUserPage />} />
               <Route path="/system/role" element={<RolePage />} />
               <Route path="/system/log" element={<AuditLogPage />} />
@@ -63,6 +67,7 @@ export default function App() {
               <Route path="/system/dict" element={<DictPage />} />
               <Route path="/system/params" element={<ParamsPage />} />
               <Route path="/system/monitor" element={<SystemMonitorPage />} />
+              <Route path="/system/icons" element={<IconLibraryPage />} />
               <Route path="/system" element={<Navigate to="/system/admin" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>

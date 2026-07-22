@@ -1,6 +1,8 @@
 import {
   DashboardOutlined,
+  DatabaseOutlined,
   HddOutlined,
+  UnorderedListOutlined,
   LineChartOutlined,
   SendOutlined,
   BellOutlined,
@@ -15,6 +17,7 @@ import {
   BookOutlined,
   SlidersOutlined,
   DesktopOutlined,
+  PictureOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -33,12 +36,27 @@ export interface MenuNode {
 // consumer (AppLayout) resolves it with t() so it re-renders on language change.
 export const menuTree: MenuNode[] = [
   { key: 'dashboard', label: 'dashboard', path: '/dashboard', icon: <DashboardOutlined /> },
-  { key: 'device', label: 'device', path: '/device', icon: <HddOutlined /> },
+  {
+    // path is a placeholder that no route/menu-click ever targets directly
+    // (deliberately distinct from any child's path -- see findTrail in
+    // AppLayout, which would otherwise short-circuit on it before matching
+    // the actual child and both mis-highlight the sider and fail to expand
+    // it). App.tsx redirects /device-management to /device for anyone who
+    // ends up here via a stale link/bookmark.
+    key: 'device-management',
+    label: 'deviceManagement',
+    path: '/device-management',
+    icon: <HddOutlined />,
+    children: [
+      { key: 'device', label: 'device', path: '/device', icon: <UnorderedListOutlined /> },
+      { key: 'command', label: 'command', path: '/command', icon: <SendOutlined /> },
+      { key: 'schedule', label: 'schedule', path: '/schedule', icon: <ScheduleOutlined /> },
+      { key: 'firmware', label: 'firmware', path: '/firmware', icon: <CloudUploadOutlined /> },
+    ],
+  },
+  { key: 'data-warehouse', label: 'dataWarehouse', path: '/data-warehouse', icon: <DatabaseOutlined /> },
   { key: 'monitor', label: 'monitor', path: '/monitor', icon: <LineChartOutlined /> },
-  { key: 'command', label: 'command', path: '/command', icon: <SendOutlined /> },
   { key: 'alert', label: 'alert', path: '/alert', icon: <BellOutlined /> },
-  { key: 'schedule', label: 'schedule', path: '/schedule', icon: <ScheduleOutlined /> },
-  { key: 'firmware', label: 'firmware', path: '/firmware', icon: <CloudUploadOutlined /> },
   {
     key: 'system',
     label: 'system.root',
@@ -53,6 +71,7 @@ export const menuTree: MenuNode[] = [
       { key: 'system-dict', label: 'system.dict', path: '/system/dict', icon: <BookOutlined /> },
       { key: 'system-params', label: 'system.params', path: '/system/params', icon: <SlidersOutlined /> },
       { key: 'system-monitor', label: 'system.monitor', path: '/system/monitor', icon: <DesktopOutlined /> },
+      { key: 'system-icons', label: 'system.icons', path: '/system/icons', icon: <PictureOutlined /> },
     ],
   },
 ]

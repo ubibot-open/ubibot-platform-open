@@ -1,0 +1,40 @@
+{
+  "title": "数据仓库",
+  "subtitle": "已激活设备共 {{count}} 台，实时展示各设备最新上报的传感器数据",
+  "loadFailed": "加载数据仓库失败",
+  "neverReported": "从未上报",
+  "noData": "暂无数据",
+  "searchPlaceholder": "搜索设备名称或SN",
+  "exportButton": "导出CSV",
+  "filters": {
+    "all": "全部"
+  },
+  "columns": {
+    "device": "设备",
+    "status": "在线状态",
+    "sensorData": "传感器数据",
+    "lastSeen": "最近上报",
+    "createdAt": "创建时间"
+  },
+  "online": {
+    "yes": "在线",
+    "no": "离线"
+  },
+  "activated": {
+    "yes": "已激活",
+    "no": "未激活"
+  },
+  "fields": {
+    "temperature": "温度",
+    "humidity": "湿度",
+    "light": "光照",
+    "battery": "电量",
+    "voltage": "电压",
+    "rssi": "信号强度",
+    "signal": "信号强度",
+    "wifi": "WiFi",
+    "interface": "供电方式",
+    "co2": "CO₂浓度",
+    "pressure": "气压"
+  }
+}

@@ -461,3 +461,20 @@ type SystemParam struct {
 }
 
 func (SystemParam) TableName() string { return "system_params" }
+
+// IconAsset is a custom SVG icon uploaded to override (or extend) the
+// built-in sensor-field icon set the "数据仓库" (data warehouse) page
+// renders. Key is the sensor field name it applies to (e.g. "temperature",
+// "co2", or any custom probe field name) -- at most one icon per key;
+// uploading again for the same key replaces it (see store.UpsertIcon).
+type IconAsset struct {
+	ID   uint   `gorm:"primaryKey"`
+	Key  string `gorm:"size:64;not null;uniqueIndex"`
+	Name string `gorm:"size:128;not null"`
+	SVG  string `gorm:"type:text;not null"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (IconAsset) TableName() string { return "icon_assets" }

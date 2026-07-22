@@ -1,0 +1,38 @@
+{
+  "pageTitle": "アイコンライブラリ",
+  "subtitle": "データウェアハウスページの各センサーフィールドのアイコンを管理します。SVGをアップロードして内蔵アイコンを上書きできます。",
+  "addButton": "アイコンを追加",
+  "replaceButton": "アップロード/置換",
+  "deleteConfirm": "このカスタムアイコンを削除しますか？削除すると内蔵アイコンに戻ります。",
+  "table": {
+    "icon": "アイコン",
+    "key": "フィールドキー",
+    "name": "名前",
+    "source": "ソース"
+  },
+  "source": {
+    "builtin": "内蔵",
+    "custom": "カスタム"
+  },
+  "modal": {
+    "title": "アイコンをアップロード",
+    "keyLabel": "フィールドキー",
+    "keyPlaceholder": "例: temperature、co2、またはカスタムプローブのフィールド名",
+    "keyExtraLocked": "ロック中 -- このフィールドのアイコンを置換します",
+    "keyExtraHint": "上報されるセンサーデータのフィールド名と一致させる必要があります",
+    "nameLabel": "名前",
+    "namePlaceholder": "任意、ライブラリ内での表示名",
+    "fileLabel": "SVGファイル",
+    "selectFileButton": "SVGファイルを選択",
+    "submitButton": "アップロード"
+  },
+  "message": {
+    "keyRequired": "フィールドキーを入力してください",
+    "fileRequired": "SVGファイルを選択してください",
+    "invalidFile": "ファイルの内容が有効なSVGではありません",
+    "uploadSuccess": "アイコンをアップロードしました",
+    "uploadFailed": "アイコンのアップロードに失敗しました",
+    "deleteSuccess": "削除しました",
+    "deleteFailed": "削除に失敗しました"
+  }
+}

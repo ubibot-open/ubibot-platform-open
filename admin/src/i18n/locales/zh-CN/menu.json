@@ -1,6 +1,8 @@
 {
   "dashboard": "仪表盘",
+  "deviceManagement": "设备管理",
   "device": "设备管理",
+  "dataWarehouse": "数据仓库",
   "monitor": "数据监控",
   "command": "指令下发",
   "alert": "告警中心",
@@ -15,6 +17,7 @@
     "files": "文件管理",
     "dict": "字典管理",
     "params": "系统参数",
-    "monitor": "系统监控"
+    "monitor": "系统监控",
+    "icons": "图标库"
   }
 }

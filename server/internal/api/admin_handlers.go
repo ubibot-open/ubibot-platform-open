@@ -170,6 +170,52 @@ func (s *Server) ListDevices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"list": list, "total": total})
 }
 
+// dataWarehouseItemDTO is a deviceDTO plus that device's single most recent
+// telemetry record (nil if it has never reported), for the "数据仓库" list's
+// sensor-data preview column. Embedding deviceDTO flattens its fields into
+// this one's JSON object (id/pid/sn/... alongside last_record).
+type dataWarehouseItemDTO struct {
+	deviceDTO
+	LastRecord *recordDTO `json:"last_record"`
+}
+
+// ListDataWarehouse handles GET /api/admin/devices/data-warehouse — like
+// ListDevices, but scoped to activated devices only and annotated with each
+// one's latest report, so the frontend can render a live sensor-data
+// preview per row without an extra request per device.
+func (s *Server) ListDataWarehouse(w http.ResponseWriter, r *http.Request) {
+	page, pageSize := paginationParams(r)
+
+	devices, total, err := s.Store.ListActivatedDevices(page, pageSize)
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+
+	ids := make([]uint, len(devices))
+	for i := range devices {
+		ids[i] = devices[i].ID
+	}
+	latest, err := s.Store.LatestRecordsByDevice(ids)
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+
+	now := s.Now()
+	list := make([]dataWarehouseItemDTO, 0, len(devices))
+	for i := range devices {
+		item := dataWarehouseItemDTO{deviceDTO: toDeviceDTO(&devices[i], now)}
+		if rec, ok := latest[devices[i].ID]; ok {
+			var d map[string]any
+			_ = json.Unmarshal([]byte(rec.Data), &d)
+			item.LastRecord = &recordDTO{Ts: rec.Ts, D: d}
+		}
+		list = append(list, item)
+	}
+	writeJSON(w, 200, map[string]any{"list": list, "total": total})
+}
+
 type createDeviceRequest struct {
 	PID    string `json:"pid"`
 	SN     string `json:"sn"`

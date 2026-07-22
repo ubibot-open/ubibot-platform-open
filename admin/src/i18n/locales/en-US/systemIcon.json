@@ -1,0 +1,38 @@
+{
+  "pageTitle": "Icon Library",
+  "subtitle": "Manage the icon shown for each sensor field on the Data Warehouse page. Upload an SVG to override a built-in icon.",
+  "addButton": "Add Icon",
+  "replaceButton": "Upload / Replace",
+  "deleteConfirm": "Delete this custom icon? The field will revert to its built-in icon.",
+  "table": {
+    "icon": "Icon",
+    "key": "Field Key",
+    "name": "Name",
+    "source": "Source"
+  },
+  "source": {
+    "builtin": "Built-in",
+    "custom": "Custom"
+  },
+  "modal": {
+    "title": "Upload Icon",
+    "keyLabel": "Field Key",
+    "keyPlaceholder": "e.g. temperature, co2, or a custom probe field name",
+    "keyExtraLocked": "Locked -- replacing this field's icon",
+    "keyExtraHint": "Must match the field key as it appears in reported sensor data",
+    "nameLabel": "Name",
+    "namePlaceholder": "Optional, shown in the icon library",
+    "fileLabel": "SVG File",
+    "selectFileButton": "Select SVG File",
+    "submitButton": "Upload"
+  },
+  "message": {
+    "keyRequired": "Field key is required",
+    "fileRequired": "Please select an SVG file",
+    "invalidFile": "File content is not a valid SVG",
+    "uploadSuccess": "Icon uploaded",
+    "uploadFailed": "Failed to upload icon",
+    "deleteSuccess": "Deleted",
+    "deleteFailed": "Failed to delete"
+  }
+}

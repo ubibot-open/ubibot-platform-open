@@ -1,0 +1,40 @@
+{
+  "title": "データウェアハウス",
+  "subtitle": "アクティベート済みデバイス {{count}} 台、各デバイスの最新の上報センサーデータを表示",
+  "loadFailed": "データウェアハウスの読み込みに失敗しました",
+  "neverReported": "未上報",
+  "noData": "データなし",
+  "searchPlaceholder": "デバイス名またはSNで検索",
+  "exportButton": "CSVエクスポート",
+  "filters": {
+    "all": "すべて"
+  },
+  "columns": {
+    "device": "デバイス",
+    "status": "オンライン状態",
+    "sensorData": "センサーデータ",
+    "lastSeen": "最終上報",
+    "createdAt": "作成日時"
+  },
+  "online": {
+    "yes": "オンライン",
+    "no": "オフライン"
+  },
+  "activated": {
+    "yes": "アクティベート済み",
+    "no": "未アクティベート"
+  },
+  "fields": {
+    "temperature": "温度",
+    "humidity": "湿度",
+    "light": "照度",
+    "battery": "バッテリー",
+    "voltage": "電圧",
+    "rssi": "電波強度",
+    "signal": "電波強度",
+    "wifi": "WiFi",
+    "interface": "電源方式",
+    "co2": "CO₂濃度",
+    "pressure": "気圧"
+  }
+}

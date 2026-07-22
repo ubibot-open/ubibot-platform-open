@@ -1,0 +1,38 @@
+{
+  "pageTitle": "图标库",
+  "subtitle": "管理数据仓库页面每个传感器字段显示的图标，可上传SVG图标覆盖内置图标",
+  "addButton": "新增图标",
+  "replaceButton": "上传/替换",
+  "deleteConfirm": "确认删除自定义图标？删除后将恢复为内置图标",
+  "table": {
+    "icon": "图标",
+    "key": "字段Key",
+    "name": "名称",
+    "source": "来源"
+  },
+  "source": {
+    "builtin": "内置",
+    "custom": "自定义"
+  },
+  "modal": {
+    "title": "上传图标",
+    "keyLabel": "字段Key",
+    "keyPlaceholder": "如 temperature、co2，或自定义探头字段名",
+    "keyExtraLocked": "已锁定，替换该字段的图标",
+    "keyExtraHint": "对应数据仓库中传感器数据的字段名，需与上报数据的key一致",
+    "nameLabel": "名称",
+    "namePlaceholder": "选填，用于在图标库中展示",
+    "fileLabel": "SVG文件",
+    "selectFileButton": "选择SVG文件",
+    "submitButton": "上传"
+  },
+  "message": {
+    "keyRequired": "请输入字段Key",
+    "fileRequired": "请选择SVG文件",
+    "invalidFile": "文件内容不是有效的SVG",
+    "uploadSuccess": "图标上传成功",
+    "uploadFailed": "图标上传失败",
+    "deleteSuccess": "已删除",
+    "deleteFailed": "删除失败"
+  }
+}

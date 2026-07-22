@@ -39,6 +39,20 @@ export function listDevices(page = 1, pageSize = 20) {
   return api.get<{ list: Device[]; total: number }>(`/api/admin/devices?page=${page}&page_size=${pageSize}`)
 }
 
+// A Device plus its single most recent telemetry record (null if it has
+// never reported) -- backs the "数据仓库" (data warehouse) page, which only
+// lists activated devices (see server/internal/api/admin_handlers.go's
+// ListDataWarehouse).
+export interface DataWarehouseItem extends Device {
+  last_record: DeviceRecord | null
+}
+
+export function listDataWarehouse(page = 1, pageSize = 20) {
+  return api.get<{ list: DataWarehouseItem[]; total: number }>(
+    `/api/admin/devices/data-warehouse?page=${page}&page_size=${pageSize}`,
+  )
+}
+
 export function createDevice(input: { pid: string; sn: string; secret?: string; name?: string }) {
   return api.post<Device>('/api/admin/devices', input)
 }

@@ -46,6 +46,11 @@ func NewRouter(s *Server) http.Handler {
 
 	// Device read/write.
 	mux.HandleFunc("GET /api/admin/devices", s.RequirePermission(model.PermDeviceRead, s.ListDevices))
+	// "数据仓库" (data warehouse): activated devices only, each with its
+	// latest telemetry record inlined -- registered before the {id} routes
+	// below purely for readability, Go 1.22's mux dispatches by exact
+	// literal-vs-wildcard segment so "data-warehouse" never matches {id}.
+	mux.HandleFunc("GET /api/admin/devices/data-warehouse", s.RequirePermission(model.PermDeviceRead, s.ListDataWarehouse))
 	mux.HandleFunc("POST /api/admin/devices", s.RequirePermission(model.PermDeviceWrite, s.CreateDevice))
 	mux.HandleFunc("GET /api/admin/devices/{id}", s.RequirePermission(model.PermDeviceRead, s.GetDevice))
 	mux.HandleFunc("GET /api/admin/devices/{id}/records", s.RequirePermission(model.PermDeviceRead, s.GetDeviceRecords))
@@ -120,6 +125,13 @@ func NewRouter(s *Server) http.Handler {
 	mux.HandleFunc("DELETE /api/admin/dict/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteDictEntry))
 	mux.HandleFunc("GET /api/admin/params", s.RequirePermission(model.PermSystemManage, s.ListSystemParams))
 	mux.HandleFunc("PATCH /api/admin/params/{key}", s.RequirePermission(model.PermSystemManage, s.SetSystemParam))
+
+	// 图标库 (数据仓库传感器图标覆盖) — list rides on device:read since it
+	// only affects how telemetry is displayed; upload/delete are a system
+	// asset change like files/dict, so they ride on system:manage.
+	mux.HandleFunc("GET /api/admin/icons", s.RequirePermission(model.PermDeviceRead, s.ListIcons))
+	mux.HandleFunc("POST /api/admin/icons", s.RequirePermission(model.PermSystemManage, s.UploadIcon))
+	mux.HandleFunc("DELETE /api/admin/icons/{key}", s.RequirePermission(model.PermSystemManage, s.DeleteIcon))
 
 	// 系统监控 + 仪表盘.
 	mux.HandleFunc("GET /api/admin/system/metrics", s.RequirePermission(model.PermSystemManage, s.SystemMetrics))
