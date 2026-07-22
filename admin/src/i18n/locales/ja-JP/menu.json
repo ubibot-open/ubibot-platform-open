@@ -1,0 +1,20 @@
+{
+  "dashboard": "ダッシュボード",
+  "device": "デバイス管理",
+  "monitor": "データモニタ",
+  "command": "コマンド送信",
+  "alert": "アラートセンター",
+  "schedule": "定期タスク",
+  "firmware": "ファームウェア管理",
+  "system": {
+    "root": "システム管理",
+    "admin": "管理者",
+    "role": "ロール",
+    "log": "操作ログ",
+    "apikey": "公開API",
+    "files": "ファイル管理",
+    "dict": "辞書管理",
+    "params": "システムパラメータ",
+    "monitor": "システム監視"
+  }
+}

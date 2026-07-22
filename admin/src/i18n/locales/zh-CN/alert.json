@@ -1,0 +1,30 @@
+{
+  "title": "告警中心",
+  "type": {
+    "threshold": "阈值告警",
+    "offline": "离线告警"
+  },
+  "filters": {
+    "devicePlaceholder": "按设备筛选"
+  },
+  "status": {
+    "open": "进行中",
+    "resolved": "已处理",
+    "all": "全部"
+  },
+  "columns": {
+    "device": "设备",
+    "type": "类型",
+    "detail": "详情",
+    "status": "状态",
+    "triggeredAt": "触发时间",
+    "actions": "操作"
+  },
+  "resolveButton": "标记处理",
+  "messages": {
+    "loadDevicesFailed": "加载设备列表失败",
+    "loadListFailed": "加载告警列表失败",
+    "resolveSuccess": "已标记为已处理",
+    "resolveFailed": "操作失败"
+  }
+}

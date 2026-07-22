@@ -1,0 +1,13 @@
+{
+  "title": "仪表盘",
+  "loadFailed": "加载仪表盘数据失败",
+  "trendsTitle": "近7天上报趋势",
+  "openAlertsTitle": "进行中的告警",
+  "noOpenAlerts": "暂无进行中的告警",
+  "stats": {
+    "online": "在线设备",
+    "offline": "离线设备",
+    "openAlerts": "进行中告警",
+    "todayRecords": "今日上报"
+  }
+}

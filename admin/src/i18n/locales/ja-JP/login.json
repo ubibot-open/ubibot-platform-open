@@ -1,0 +1,11 @@
+{
+  "title": "UbiBot 管理画面",
+  "loginFailed": "ログインに失敗しました。もう一度お試しください",
+  "form": {
+    "usernameRequired": "ユーザー名を入力してください",
+    "usernamePlaceholder": "ユーザー名",
+    "passwordRequired": "パスワードを入力してください",
+    "passwordPlaceholder": "パスワード",
+    "submit": "ログイン"
+  }
+}

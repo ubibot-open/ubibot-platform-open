@@ -3,15 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { createDevice, listDevices, type Device } from '../../api/device'
-import { ApiError } from '../../api/client'
-
-function formatTime(ts: number | null) {
-  if (!ts) return '从未上报'
-  return new Date(ts * 1000).toLocaleString()
-}
+import { apiErrorMessage } from '../../api/errors'
 
 export default function DevicePage() {
+  const { t } = useTranslation('device')
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [devices, setDevices] = useState<Device[]>([])
@@ -22,6 +19,11 @@ export default function DevicePage() {
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [form] = Form.useForm()
 
+  function formatTime(ts: number | null) {
+    if (!ts) return t('neverReported')
+    return new Date(ts * 1000).toLocaleString()
+  }
+
   const load = async (p = page) => {
     setLoading(true)
     try {
@@ -30,7 +32,7 @@ export default function DevicePage() {
       setTotal(res.total)
       setPage(p)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载设备列表失败')
+      message.error(apiErrorMessage(e, t('loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -45,12 +47,12 @@ export default function DevicePage() {
     setCreating(true)
     try {
       const dev = await createDevice(values)
-      message.success('设备创建成功')
+      message.success(t('create.success'))
       setCreatedSecret(dev.secret ?? null)
       form.resetFields()
       load(1)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '创建失败')
+      message.error(apiErrorMessage(e, t('create.failed')))
     } finally {
       setCreating(false)
     }
@@ -58,34 +60,44 @@ export default function DevicePage() {
 
   const columns: ColumnsType<Device> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: '设备名称', dataIndex: 'name', render: (v: string, r) => v || r.sn },
+    { title: t('columns.name'), dataIndex: 'name', render: (v: string, r) => v || r.sn },
     { title: 'SN', dataIndex: 'sn' },
     { title: 'PID', dataIndex: 'pid' },
     {
-      title: '状态',
+      title: t('columns.status'),
       dataIndex: 'status',
       width: 90,
       render: (status: number) =>
-        status === 1 ? <Tag color="success">启用</Tag> : <Tag color="default">停用</Tag>,
+        status === 1 ? (
+          <Tag color="success">{t('common:enabled')}</Tag>
+        ) : (
+          <Tag color="default">{t('common:disabled')}</Tag>
+        ),
     },
     {
-      title: '激活状态',
+      title: t('columns.activated'),
       dataIndex: 'activated',
       width: 90,
-      render: (activated: boolean) => (activated ? <Tag color="blue">已激活</Tag> : <Tag color="default">未激活</Tag>),
+      render: (activated: boolean) =>
+        activated ? (
+          <Tag color="blue">{t('activated.yes')}</Tag>
+        ) : (
+          <Tag color="default">{t('activated.no')}</Tag>
+        ),
     },
     {
-      title: '在线',
+      title: t('columns.online'),
       dataIndex: 'online',
       width: 80,
-      render: (online: boolean) => (online ? <Tag color="green">在线</Tag> : <Tag color="default">离线</Tag>),
+      render: (online: boolean) =>
+        online ? <Tag color="green">{t('online.yes')}</Tag> : <Tag color="default">{t('online.no')}</Tag>,
     },
-    { title: '采集/上报间隔(s)', render: (_, r) => `${r.ci} / ${r.ui}` },
-    { title: '最近上报', dataIndex: 'last_seen_at', render: formatTime },
+    { title: t('columns.interval'), render: (_, r) => `${r.ci} / ${r.ui}` },
+    { title: t('columns.lastSeen'), dataIndex: 'last_seen_at', render: formatTime },
     {
-      title: '操作',
+      title: t('columns.actions'),
       width: 100,
-      render: (_, r) => <a onClick={() => navigate(`/device/${r.id}`)}>详情</a>,
+      render: (_, r) => <a onClick={() => navigate(`/device/${r.id}`)}>{t('detail')}</a>,
     },
   ]
 
@@ -93,7 +105,7 @@ export default function DevicePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          设备管理
+          {t('title')}
         </Typography.Title>
         <Button
           type="primary"
@@ -103,7 +115,7 @@ export default function DevicePage() {
             setCreateOpen(true)
           }}
         >
-          新建设备
+          {t('create.button')}
         </Button>
       </div>
 
@@ -116,7 +128,7 @@ export default function DevicePage() {
       />
 
       <Modal
-        title="新建设备"
+        title={t('create.modalTitle')}
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         footer={null}
@@ -124,37 +136,35 @@ export default function DevicePage() {
       >
         {createdSecret ? (
           <div>
-            <Typography.Paragraph>
-              设备已创建。设备密钥只会显示这一次，请立即记录并烧录到设备中：
-            </Typography.Paragraph>
+            <Typography.Paragraph>{t('create.createdNotice')}</Typography.Paragraph>
             <Typography.Text code copyable style={{ fontSize: 14 }}>
               {createdSecret}
             </Typography.Text>
             <div style={{ marginTop: 16, textAlign: 'right' }}>
               <Button type="primary" onClick={() => setCreateOpen(false)}>
-                知道了
+                {t('create.gotIt')}
               </Button>
             </div>
           </div>
         ) : (
           <Form form={form} layout="vertical" onFinish={onCreate}>
-            <Form.Item name="pid" label="产品型号 (PID)" rules={[{ required: true }]}>
-              <Input placeholder="ubibot_open_dev_v1" />
+            <Form.Item name="pid" label={t('create.pidLabel')} rules={[{ required: true }]}>
+              <Input placeholder={t('create.pidPlaceholder')} />
             </Form.Item>
-            <Form.Item name="sn" label="设备序列号 (SN)" rules={[{ required: true }]}>
-              <Input placeholder="sn_ws1_20002_1" />
+            <Form.Item name="sn" label={t('create.snLabel')} rules={[{ required: true }]}>
+              <Input placeholder={t('create.snPlaceholder')} />
             </Form.Item>
-            <Form.Item name="name" label="设备名称">
-              <Input placeholder="选填" />
+            <Form.Item name="name" label={t('create.nameLabel')}>
+              <Input placeholder={t('create.namePlaceholder')} />
             </Form.Item>
-            <Form.Item name="secret" label="设备密钥" extra="留空则自动生成">
-              <Input placeholder="选填，留空自动生成" />
+            <Form.Item name="secret" label={t('create.secretLabel')} extra={t('create.secretExtra')}>
+              <Input placeholder={t('create.secretPlaceholder')} />
             </Form.Item>
             <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
               <Space>
-                <Button onClick={() => setCreateOpen(false)}>取消</Button>
+                <Button onClick={() => setCreateOpen(false)}>{t('common:cancel')}</Button>
                 <Button type="primary" htmlType="submit" loading={creating}>
-                  创建
+                  {t('create.submit')}
                 </Button>
               </Space>
             </Form.Item>

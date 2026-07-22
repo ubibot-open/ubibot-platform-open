@@ -1,0 +1,12 @@
+{
+  "title": "操作ログ",
+  "columns": {
+    "time": "時刻",
+    "operator": "操作者",
+    "action": "アクション",
+    "target": "対象",
+    "detail": "詳細",
+    "ip": "IP"
+  },
+  "loadFailed": "操作ログの読み込みに失敗しました"
+}

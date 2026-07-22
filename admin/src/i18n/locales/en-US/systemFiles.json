@@ -1,0 +1,25 @@
+{
+  "pageTitle": "File Management",
+  "uploadButton": "Upload File",
+  "table": {
+    "category": "Category",
+    "filename": "Filename",
+    "size": "Size",
+    "uploadedAt": "Uploaded At"
+  },
+  "deleteConfirm": "Delete this file?",
+  "modal": {
+    "title": "Upload File",
+    "categoryLabel": "Category",
+    "categoryPlaceholder": "e.g. export / attachment",
+    "fileLabel": "File",
+    "selectFileButton": "Select File",
+    "submitButton": "Upload"
+  },
+  "message": {
+    "loadFailed": "Failed to load file list",
+    "selectFileRequired": "Please select a file",
+    "uploadSuccess": "File uploaded",
+    "uploadFailed": "Upload failed"
+  }
+}

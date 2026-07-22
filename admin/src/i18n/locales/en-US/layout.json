@@ -1,0 +1,11 @@
+{
+  "brand": "UbiBot Admin",
+  "home": "Home",
+  "toggleTheme": "Toggle theme",
+  "notifications": "Notifications",
+  "noNotifications": "No notifications",
+  "adminRole": "Administrator",
+  "userMenu": {
+    "profile": "Profile Settings"
+  }
+}

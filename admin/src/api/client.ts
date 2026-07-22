@@ -19,9 +19,15 @@ export function clearToken() {
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  // Stable, language-neutral code from the backend (see
+  // server/internal/api/middleware.go's adminErrCodes) -- use this to look
+  // up a translated message (src/api/errors.ts) instead of displaying
+  // `.message` (always English) directly to the user.
+  code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -49,7 +55,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.()
-    throw new ApiError(res.status, data.message ?? `request failed (${res.status})`)
+    throw new ApiError(res.status, data.message ?? `request failed (${res.status})`, data.code)
   }
   return data as T
 }

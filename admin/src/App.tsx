@@ -1,6 +1,7 @@
 import { ConfigProvider, theme } from 'antd'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useThemeMode } from './contexts/ThemeContext'
+import { useAntdLocale } from './i18n/useAntdLocale'
 import { AuthProvider } from './contexts/AuthContext'
 import RequireAuth from './components/RequireAuth'
 import AppLayout from './layouts/AppLayout'
@@ -24,9 +25,11 @@ import SystemMonitorPage from './pages/System/Monitor'
 
 export default function App() {
   const { mode } = useThemeMode()
+  const antdLocale = useAntdLocale()
 
   return (
     <ConfigProvider
+      locale={antdLocale}
       theme={{
         algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: { colorPrimary: '#185FA5', borderRadius: 8 },

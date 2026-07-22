@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Typography, Upload, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { deleteFileAsset, listFileAssets, uploadFileAsset, type FileAsset } from '../../api/fileasset'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -12,6 +13,7 @@ function formatSize(bytes: number) {
 }
 
 export default function FilesPage() {
+  const { t } = useTranslation('systemFiles')
   const [rows, setRows] = useState<FileAsset[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -25,7 +27,7 @@ export default function FilesPage() {
       const res = await listFileAssets()
       setRows(res.list)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载文件列表失败')
+      message.error(apiErrorMessage(e, t('message.loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -37,19 +39,19 @@ export default function FilesPage() {
 
   const onSubmit = async (values: { category: string }) => {
     if (!file) {
-      message.error('请选择文件')
+      message.error(t('message.selectFileRequired'))
       return
     }
     setSubmitting(true)
     try {
       await uploadFileAsset({ category: values.category || 'other', file })
-      message.success('已上传')
+      message.success(t('message.uploadSuccess'))
       setOpen(false)
       form.resetFields()
       setFile(null)
       load()
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '上传失败')
+      message.error(apiErrorMessage(e, t('message.uploadFailed')))
     } finally {
       setSubmitting(false)
     }
@@ -58,24 +60,24 @@ export default function FilesPage() {
   const onDelete = async (id: number) => {
     try {
       await deleteFileAsset(id)
-      message.success('已删除')
+      message.success(t('common:deleteSuccess'))
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '删除失败')
+      message.error(apiErrorMessage(e, t('common:deleteFailed')))
     }
   }
 
   const columns: ColumnsType<FileAsset> = [
-    { title: '分类', dataIndex: 'category' },
-    { title: '文件名', dataIndex: 'filename' },
-    { title: '大小', dataIndex: 'size', render: formatSize },
-    { title: '上传时间', dataIndex: 'created_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    { title: t('table.category'), dataIndex: 'category' },
+    { title: t('table.filename'), dataIndex: 'filename' },
+    { title: t('table.size'), dataIndex: 'size', render: formatSize },
+    { title: t('table.uploadedAt'), dataIndex: 'created_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
     {
-      title: '操作',
+      title: t('common:actions'),
       width: 80,
       render: (_, r) => (
-        <Popconfirm title="确认删除该文件？" onConfirm={() => onDelete(r.id)}>
-          <a>删除</a>
+        <Popconfirm title={t('deleteConfirm')} onConfirm={() => onDelete(r.id)}>
+          <a>{t('common:delete')}</a>
         </Popconfirm>
       ),
     },
@@ -85,22 +87,22 @@ export default function FilesPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          文件管理
+          {t('pageTitle')}
         </Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-          上传文件
+          {t('uploadButton')}
         </Button>
       </div>
       <Card>
         <Table rowKey="id" columns={columns} dataSource={rows} loading={loading} pagination={false} />
       </Card>
 
-      <Modal title="上传文件" open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose>
+      <Modal title={t('modal.title')} open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose>
         <Form form={form} layout="vertical" onFinish={onSubmit}>
-          <Form.Item name="category" label="分类" initialValue="other">
-            <Input placeholder="如：export / attachment" />
+          <Form.Item name="category" label={t('modal.categoryLabel')} initialValue="other">
+            <Input placeholder={t('modal.categoryPlaceholder')} />
           </Form.Item>
-          <Form.Item label="文件" required>
+          <Form.Item label={t('modal.fileLabel')} required>
             <Upload
               beforeUpload={(f) => {
                 setFile(f)
@@ -109,14 +111,14 @@ export default function FilesPage() {
               maxCount={1}
               onRemove={() => setFile(null)}
             >
-              <Button icon={<UploadOutlined />}>选择文件</Button>
+              <Button icon={<UploadOutlined />}>{t('modal.selectFileButton')}</Button>
             </Upload>
           </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setOpen(false)}>取消</Button>
+              <Button onClick={() => setOpen(false)}>{t('common:cancel')}</Button>
               <Button type="primary" htmlType="submit" loading={submitting}>
-                上传
+                {t('modal.submitButton')}
               </Button>
             </Space>
           </Form.Item>

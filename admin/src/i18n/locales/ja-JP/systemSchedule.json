@@ -1,0 +1,35 @@
+{
+  "pageTitle": "定期タスク",
+  "createButton": "タスクを新規作成",
+  "allEnabledDevices": "有効なすべてのデバイス",
+  "table": {
+    "targetDevice": "対象デバイス",
+    "cmdType": "コマンド種別",
+    "schedule": "スケジュール",
+    "nextRunAt": "次回実行",
+    "intervalDisplay": "{{seconds}}秒ごと",
+    "dailyDisplay": "毎日 {{time}}"
+  },
+  "cmdType": {
+    "reboot": "再起動",
+    "calibrate": "キャリブレーション"
+  },
+  "scheduleType": {
+    "interval": "固定間隔",
+    "daily": "毎日固定時刻"
+  },
+  "deleteConfirm": "このタスクを削除しますか？",
+  "modal": {
+    "editTitle": "タスクを編集",
+    "createTitle": "タスクを新規作成",
+    "nameLabel": "タスク名",
+    "namePlaceholder": "例：夜間再起動",
+    "scheduleTypeLabel": "スケジュール方式",
+    "intervalSecondsLabel": "実行間隔（秒）",
+    "intervalSecondsPlaceholder": "60秒以上",
+    "dailyAtLabel": "実行時刻"
+  },
+  "message": {
+    "loadFailed": "定期タスクの読み込みに失敗しました"
+  }
+}

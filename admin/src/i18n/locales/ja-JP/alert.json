@@ -1,0 +1,30 @@
+{
+  "title": "アラートセンター",
+  "type": {
+    "threshold": "しきい値アラート",
+    "offline": "オフラインアラート"
+  },
+  "filters": {
+    "devicePlaceholder": "デバイスで絞り込み"
+  },
+  "status": {
+    "open": "対応中",
+    "resolved": "対応済み",
+    "all": "すべて"
+  },
+  "columns": {
+    "device": "デバイス",
+    "type": "種別",
+    "detail": "詳細",
+    "status": "状態",
+    "triggeredAt": "発生時刻",
+    "actions": "操作"
+  },
+  "resolveButton": "対応済みにする",
+  "messages": {
+    "loadDevicesFailed": "デバイス一覧の読み込みに失敗しました",
+    "loadListFailed": "アラート一覧の読み込みに失敗しました",
+    "resolveSuccess": "対応済みにしました",
+    "resolveFailed": "操作に失敗しました"
+  }
+}

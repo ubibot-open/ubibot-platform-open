@@ -1,0 +1,13 @@
+{
+  "title": "ダッシュボード",
+  "loadFailed": "ダッシュボードデータの読み込みに失敗しました",
+  "trendsTitle": "直近7日間の上報推移",
+  "openAlertsTitle": "対応中のアラート",
+  "noOpenAlerts": "対応中のアラートはありません",
+  "stats": {
+    "online": "オンラインデバイス",
+    "offline": "オフラインデバイス",
+    "openAlerts": "対応中アラート",
+    "todayRecords": "本日の上報件数"
+  }
+}

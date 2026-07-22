@@ -1,0 +1,9 @@
+{
+  "titles": {
+    "admin": "管理者",
+    "role": "ロール",
+    "log": "操作ログ",
+    "default": "システム管理"
+  },
+  "placeholderDescription": "このページは開発中です"
+}

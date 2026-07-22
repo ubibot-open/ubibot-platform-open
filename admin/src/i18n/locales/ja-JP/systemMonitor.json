@@ -1,0 +1,19 @@
+{
+  "pageTitle": "システムモニター",
+  "refreshNote": "10秒ごとに自動更新します。",
+  "uptimeFormat": "{{d}}日{{h}}時間{{m}}分",
+  "stats": {
+    "uptime": "稼働時間",
+    "goroutines": "Goroutine 数",
+    "heapAlloc": "ヒープメモリ使用量",
+    "dbSize": "データベースファイルサイズ",
+    "deviceTotal": "デバイス総数",
+    "pendingCommands": "確認待ちコマンド",
+    "openAlerts": "発生中のアラート",
+    "unreadNotifications": "未読通知"
+  },
+  "goVersionLabel": "Go バージョン：{{version}}",
+  "message": {
+    "loadFailed": "システム指標の読み込みに失敗しました"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "pageTitle": "ファームウェア管理",
+  "uploadButton": "ファームウェアをアップロード",
+  "table": {
+    "version": "バージョン",
+    "filename": "ファイル名",
+    "size": "サイズ",
+    "signature": "署名",
+    "hasSig": "あり",
+    "noSig": "なし",
+    "uploadedAt": "アップロード日時"
+  },
+  "deleteConfirm": "このファームウェアを削除しますか？",
+  "modal": {
+    "title": "ファームウェアのアップロード",
+    "pidLabel": "製品型番 (PID)",
+    "versionLabel": "バージョン",
+    "signatureLabel": "署名（任意）",
+    "signatureExtra": "プラットフォームによるファームウェアの署名で、デバイス側の検証に使用します。プロトコル§7.3を参照。",
+    "fileLabel": "ファームウェアファイル",
+    "selectFileButton": "ファイルを選択",
+    "submitButton": "アップロード"
+  },
+  "message": {
+    "loadFailed": "ファームウェア一覧の読み込みに失敗しました",
+    "selectFileRequired": "ファームウェアファイルを選択してください",
+    "uploadSuccess": "ファームウェアをアップロードしました",
+    "uploadFailed": "アップロードに失敗しました"
+  }
+}

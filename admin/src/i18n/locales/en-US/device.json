@@ -1,0 +1,44 @@
+{
+  "title": "Device Management",
+  "loadFailed": "Failed to load device list",
+  "detail": "Details",
+  "neverReported": "Never reported",
+  "columns": {
+    "id": "ID",
+    "name": "Device Name",
+    "sn": "SN",
+    "pid": "PID",
+    "status": "Status",
+    "activated": "Activation",
+    "online": "Online",
+    "interval": "Collect/Upload Interval (s)",
+    "lastSeen": "Last Seen",
+    "actions": "Actions"
+  },
+  "activated": {
+    "yes": "Activated",
+    "no": "Not Activated"
+  },
+  "online": {
+    "yes": "Online",
+    "no": "Offline"
+  },
+  "create": {
+    "button": "New Device",
+    "modalTitle": "New Device",
+    "success": "Device created successfully",
+    "failed": "Failed to create device",
+    "createdNotice": "Device created. The device secret is shown only once — record it and flash it to the device immediately:",
+    "gotIt": "Got it",
+    "pidLabel": "Product ID (PID)",
+    "pidPlaceholder": "ubibot_open_dev_v1",
+    "snLabel": "Serial Number (SN)",
+    "snPlaceholder": "sn_ws1_20002_1",
+    "nameLabel": "Device Name",
+    "namePlaceholder": "Optional",
+    "secretLabel": "Device Secret",
+    "secretExtra": "Leave blank to auto-generate",
+    "secretPlaceholder": "Optional, auto-generated if left blank",
+    "submit": "Create"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "titles": {
+    "admin": "Admins",
+    "role": "Roles",
+    "log": "Audit Logs",
+    "default": "System"
+  },
+  "placeholderDescription": "This page is under development"
+}

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { createDictEntry, deleteDictEntry, listDictEntries, updateDictEntry, type DictEntry } from '../../api/dict'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function DictPage() {
+  const { t } = useTranslation('systemDict')
   const [rows, setRows] = useState<DictEntry[]>([])
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(false)
@@ -20,7 +22,7 @@ export default function DictPage() {
       const res = await listDictEntries(typeFilter)
       setRows(res.list)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载字典失败')
+      message.error(apiErrorMessage(e, t('message.loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -51,11 +53,11 @@ export default function DictPage() {
       } else {
         await createDictEntry(values)
       }
-      message.success('保存成功')
+      message.success(t('common:saveSuccess'))
       setOpen(false)
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '保存失败')
+      message.error(apiErrorMessage(e, t('common:saveFailed')))
     } finally {
       setSubmitting(false)
     }
@@ -64,26 +66,26 @@ export default function DictPage() {
   const onDelete = async (id: number) => {
     try {
       await deleteDictEntry(id)
-      message.success('已删除')
+      message.success(t('common:deleteSuccess'))
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '删除失败')
+      message.error(apiErrorMessage(e, t('common:deleteFailed')))
     }
   }
 
   const columns: ColumnsType<DictEntry> = [
-    { title: '字典类型', dataIndex: 'type' },
+    { title: t('table.dictType'), dataIndex: 'type' },
     { title: 'Key', dataIndex: 'key' },
-    { title: '显示名称', dataIndex: 'label' },
-    { title: '排序', dataIndex: 'sort' },
+    { title: t('table.label'), dataIndex: 'label' },
+    { title: t('table.sort'), dataIndex: 'sort' },
     {
-      title: '操作',
+      title: t('common:actions'),
       width: 140,
       render: (_, r) => (
         <Space>
-          <a onClick={() => openEdit(r)}>编辑</a>
-          <Popconfirm title="确认删除该字典项？" onConfirm={() => onDelete(r.id)}>
-            <a>删除</a>
+          <a onClick={() => openEdit(r)}>{t('common:edit')}</a>
+          <Popconfirm title={t('deleteConfirm')} onConfirm={() => onDelete(r.id)}>
+            <a>{t('common:delete')}</a>
           </Popconfirm>
         </Space>
       ),
@@ -94,16 +96,16 @@ export default function DictPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          字典管理
+          {t('pageTitle')}
         </Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建字典项
+          {t('createButton')}
         </Button>
       </div>
       <Space style={{ marginBottom: 16 }}>
         <Select
           style={{ width: 200 }}
-          placeholder="按类型筛选"
+          placeholder={t('filterPlaceholder')}
           allowClear
           value={typeFilter}
           onChange={setTypeFilter}
@@ -118,25 +120,36 @@ export default function DictPage() {
         <Table rowKey="id" columns={columns} dataSource={rows} loading={loading} pagination={false} />
       </Card>
 
-      <Modal title={editing ? '编辑字典项' : '新建字典项'} open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose>
+      <Modal
+        title={editing ? t('modal.editTitle') : t('modal.createTitle')}
+        open={open}
+        onCancel={() => setOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" onFinish={onSubmit}>
-          <Form.Item name="type" label="字典类型" rules={[{ required: true }]} extra={editing ? '创建后不可修改' : '如 command_type'}>
+          <Form.Item
+            name="type"
+            label={t('table.dictType')}
+            rules={[{ required: true }]}
+            extra={editing ? t('modal.typeExtraLocked') : t('modal.typeExtraHint')}
+          >
             <Input disabled={!!editing} />
           </Form.Item>
-          <Form.Item name="key" label="Key" rules={[{ required: true }]} extra={editing ? '创建后不可修改' : undefined}>
+          <Form.Item name="key" label="Key" rules={[{ required: true }]} extra={editing ? t('modal.typeExtraLocked') : undefined}>
             <Input disabled={!!editing} />
           </Form.Item>
-          <Form.Item name="label" label="显示名称" rules={[{ required: true }]}>
+          <Form.Item name="label" label={t('table.label')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="sort" label="排序" initialValue={0}>
+          <Form.Item name="sort" label={t('table.sort')} initialValue={0}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setOpen(false)}>取消</Button>
+              <Button onClick={() => setOpen(false)}>{t('common:cancel')}</Button>
               <Button type="primary" htmlType="submit" loading={submitting}>
-                保存
+                {t('common:save')}
               </Button>
             </Space>
           </Form.Item>

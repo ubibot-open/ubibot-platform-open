@@ -1,0 +1,11 @@
+{
+  "pageTitle": "System Parameters",
+  "description": "Changes take effect immediately (e.g. request rate limit thresholds, offline grace period) without restarting the service.",
+  "table": {
+    "value": "Value"
+  },
+  "message": {
+    "loadFailed": "Failed to load system parameters",
+    "saveSuccess": "Saved and applied"
+  }
+}

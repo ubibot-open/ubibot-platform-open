@@ -1,0 +1,35 @@
+{
+  "title": "Role Management",
+  "createButton": "New Role",
+  "columns": {
+    "name": "Name",
+    "code": "Code",
+    "permissions": "Permissions",
+    "actions": "Actions"
+  },
+  "noPermission": "None",
+  "deleteConfirmTitle": "Delete this role?",
+  "modal": {
+    "createTitle": "New Role",
+    "editTitle": "Edit Role"
+  },
+  "form": {
+    "name": "Role Name",
+    "namePlaceholder": "e.g. Operations Operator",
+    "code": "Role Code",
+    "codeExtraEditing": "Code cannot be changed after creation",
+    "codeExtraCreating": "An English identifier, e.g. operator",
+    "permissions": "Permissions"
+  },
+  "permissionLabels": {
+    "deviceRead": "Device View",
+    "deviceWrite": "Device Management (incl. probe configuration)",
+    "commandWrite": "Command Dispatch",
+    "alertManage": "Alert Management",
+    "systemManage": "System Management (Roles/Admins/Logs)",
+    "all": "All Permissions"
+  },
+  "loadFailed": "Failed to load role list",
+  "saveFailed": "Save failed",
+  "deleteFailed": "Delete failed (an admin may still be using this role)"
+}

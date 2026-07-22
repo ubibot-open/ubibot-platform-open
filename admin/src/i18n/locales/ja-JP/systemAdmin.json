@@ -1,0 +1,26 @@
+{
+  "title": "管理者",
+  "createButton": "管理者を新規作成",
+  "columns": {
+    "username": "ユーザー名",
+    "role": "ロール",
+    "createdAt": "作成日時",
+    "actions": "操作"
+  },
+  "deleteConfirmTitle": "この管理者を削除しますか？",
+  "modal": {
+    "createTitle": "管理者を新規作成",
+    "editTitle": "管理者を編集"
+  },
+  "form": {
+    "username": "ユーザー名",
+    "password": "パスワード",
+    "passwordResetLabel": "パスワードをリセット（空欄の場合は変更されません）",
+    "role": "ロール",
+    "rolePlaceholder": "ロールを選択"
+  },
+  "usernamePasswordRequired": "ユーザー名とパスワードは必須です",
+  "loadFailed": "管理者一覧の読み込みに失敗しました",
+  "saveFailed": "保存に失敗しました",
+  "deleteFailed": "削除に失敗しました"
+}

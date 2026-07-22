@@ -1,0 +1,12 @@
+{
+  "title": "データモニタリング",
+  "devicePlaceholder": "デバイスを選択",
+  "queryButton": "検索",
+  "columns": {
+    "time": "時刻"
+  },
+  "messages": {
+    "loadDevicesFailed": "デバイス一覧の読み込みに失敗しました",
+    "queryFailed": "検索に失敗しました"
+  }
+}

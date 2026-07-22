@@ -1,0 +1,30 @@
+{
+  "title": "Alert Center",
+  "type": {
+    "threshold": "Threshold Alert",
+    "offline": "Offline Alert"
+  },
+  "filters": {
+    "devicePlaceholder": "Filter by device"
+  },
+  "status": {
+    "open": "Open",
+    "resolved": "Resolved",
+    "all": "All"
+  },
+  "columns": {
+    "device": "Device",
+    "type": "Type",
+    "detail": "Detail",
+    "status": "Status",
+    "triggeredAt": "Triggered At",
+    "actions": "Actions"
+  },
+  "resolveButton": "Mark Resolved",
+  "messages": {
+    "loadDevicesFailed": "Failed to load device list",
+    "loadListFailed": "Failed to load alert list",
+    "resolveSuccess": "Marked as resolved",
+    "resolveFailed": "Operation failed"
+  }
+}

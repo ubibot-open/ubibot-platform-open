@@ -1,0 +1,13 @@
+{
+  "title": "Dashboard",
+  "loadFailed": "Failed to load dashboard data",
+  "trendsTitle": "Reports (Last 7 Days)",
+  "openAlertsTitle": "Open Alerts",
+  "noOpenAlerts": "No open alerts",
+  "stats": {
+    "online": "Online Devices",
+    "offline": "Offline Devices",
+    "openAlerts": "Open Alerts",
+    "todayRecords": "Today's Reports"
+  }
+}

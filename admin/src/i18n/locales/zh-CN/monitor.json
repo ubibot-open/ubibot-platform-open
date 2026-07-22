@@ -1,0 +1,12 @@
+{
+  "title": "数据监控",
+  "devicePlaceholder": "选择设备",
+  "queryButton": "查询",
+  "columns": {
+    "time": "时间"
+  },
+  "messages": {
+    "loadDevicesFailed": "加载设备列表失败",
+    "queryFailed": "查询失败"
+  }
+}

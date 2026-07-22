@@ -1,0 +1,20 @@
+{
+  "dashboard": "Dashboard",
+  "device": "Devices",
+  "monitor": "Data Monitor",
+  "command": "Commands",
+  "alert": "Alert Center",
+  "schedule": "Scheduled Tasks",
+  "firmware": "Firmware",
+  "system": {
+    "root": "System",
+    "admin": "Admins",
+    "role": "Roles",
+    "log": "Audit Log",
+    "apikey": "Open API",
+    "files": "Files",
+    "dict": "Dictionaries",
+    "params": "System Params",
+    "monitor": "System Monitor"
+  }
+}

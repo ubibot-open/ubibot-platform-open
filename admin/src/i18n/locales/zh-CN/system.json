@@ -1,0 +1,9 @@
+{
+  "titles": {
+    "admin": "管理员",
+    "role": "角色",
+    "log": "操作日志",
+    "default": "系统管理"
+  },
+  "placeholderDescription": "页面开发中"
+}

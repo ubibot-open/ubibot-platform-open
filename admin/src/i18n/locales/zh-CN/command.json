@@ -1,0 +1,24 @@
+{
+  "title": "指令管理",
+  "status": {
+    "pending": "待确认",
+    "acked": "已确认",
+    "nacked": "执行失败"
+  },
+  "filters": {
+    "devicePlaceholder": "按设备筛选",
+    "statusPlaceholder": "按状态筛选"
+  },
+  "columns": {
+    "id": "指令ID",
+    "device": "设备",
+    "type": "类型",
+    "args": "参数",
+    "status": "状态",
+    "createdAt": "下发时间"
+  },
+  "messages": {
+    "loadDevicesFailed": "加载设备列表失败",
+    "loadListFailed": "加载指令历史失败"
+  }
+}

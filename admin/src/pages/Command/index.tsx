@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Card, Select, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useTranslation } from 'react-i18next'
 import { listAllCommands, type GlobalCommand } from '../../api/command'
 import { listDevices, type Device } from '../../api/device'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
-const statusTag: Record<GlobalCommand['status'], { color: string; text: string }> = {
-  pending: { color: 'processing', text: '待确认' },
-  acked: { color: 'success', text: '已确认' },
-  nacked: { color: 'error', text: '执行失败' },
+const statusColor: Record<GlobalCommand['status'], string> = {
+  pending: 'processing',
+  acked: 'success',
+  nacked: 'error',
 }
 
 export default function CommandPage() {
+  const { t } = useTranslation('command')
   const [devices, setDevices] = useState<Device[]>([])
   const [deviceId, setDeviceId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<string | undefined>(undefined)
@@ -23,7 +25,7 @@ export default function CommandPage() {
   useEffect(() => {
     listDevices(1, 200)
       .then((res) => setDevices(res.list))
-      .catch((e) => message.error(e instanceof ApiError ? e.message : '加载设备列表失败'))
+      .catch((e) => message.error(apiErrorMessage(e, t('messages.loadDevicesFailed'))))
   }, [])
 
   const load = async (p = 1) => {
@@ -34,7 +36,7 @@ export default function CommandPage() {
       setTotal(res.total)
       setPage(p)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载指令历史失败')
+      message.error(apiErrorMessage(e, t('messages.loadListFailed')))
     } finally {
       setLoading(false)
     }
@@ -46,34 +48,34 @@ export default function CommandPage() {
   }, [deviceId, status])
 
   const columns: ColumnsType<GlobalCommand> = [
-    { title: '指令ID', dataIndex: 'id', width: 90 },
-    { title: '设备', dataIndex: 'device_name' },
-    { title: '类型', dataIndex: 'type' },
-    { title: '参数', dataIndex: 'args', render: (a?: Record<string, unknown>) => (a ? JSON.stringify(a) : '-') },
+    { title: t('columns.id'), dataIndex: 'id', width: 90 },
+    { title: t('columns.device'), dataIndex: 'device_name' },
+    { title: t('columns.type'), dataIndex: 'type' },
+    { title: t('columns.args'), dataIndex: 'args', render: (a?: Record<string, unknown>) => (a ? JSON.stringify(a) : '-') },
     {
-      title: '状态',
+      title: t('columns.status'),
       dataIndex: 'status',
       width: 100,
       render: (s: GlobalCommand['status'], r) => (
         <Space direction="vertical" size={0}>
-          <Tag color={statusTag[s].color}>{statusTag[s].text}</Tag>
+          <Tag color={statusColor[s]}>{t(`status.${s}`)}</Tag>
           {r.nak_message && <span style={{ fontSize: 12, color: '#cf1322' }}>{r.nak_message}</span>}
         </Space>
       ),
     },
-    { title: '下发时间', dataIndex: 'created_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    { title: t('columns.createdAt'), dataIndex: 'created_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
   ]
 
   return (
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>
-        指令管理
+        {t('title')}
       </Typography.Title>
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
             style={{ width: 200 }}
-            placeholder="按设备筛选"
+            placeholder={t('filters.devicePlaceholder')}
             allowClear
             value={deviceId}
             onChange={setDeviceId}
@@ -83,14 +85,14 @@ export default function CommandPage() {
           />
           <Select
             style={{ width: 140 }}
-            placeholder="按状态筛选"
+            placeholder={t('filters.statusPlaceholder')}
             allowClear
             value={status}
             onChange={setStatus}
             options={[
-              { value: 'pending', label: '待确认' },
-              { value: 'acked', label: '已确认' },
-              { value: 'nacked', label: '执行失败' },
+              { value: 'pending', label: t('status.pending') },
+              { value: 'acked', label: t('status.acked') },
+              { value: 'nacked', label: t('status.nacked') },
             ]}
           />
         </Space>

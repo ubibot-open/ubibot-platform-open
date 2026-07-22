@@ -1,0 +1,20 @@
+{
+  "dashboard": "仪表盘",
+  "device": "设备管理",
+  "monitor": "数据监控",
+  "command": "指令下发",
+  "alert": "告警中心",
+  "schedule": "定时任务",
+  "firmware": "固件管理",
+  "system": {
+    "root": "系统管理",
+    "admin": "管理员",
+    "role": "角色",
+    "log": "操作日志",
+    "apikey": "开放API",
+    "files": "文件管理",
+    "dict": "字典管理",
+    "params": "系统参数",
+    "monitor": "系统监控"
+  }
+}

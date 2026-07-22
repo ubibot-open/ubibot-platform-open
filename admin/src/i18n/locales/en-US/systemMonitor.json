@@ -1,0 +1,19 @@
+{
+  "pageTitle": "System Monitor",
+  "refreshNote": "Refreshes automatically every 10 seconds.",
+  "uptimeFormat": "{{d}}d {{h}}h {{m}}m",
+  "stats": {
+    "uptime": "Uptime",
+    "goroutines": "Goroutines",
+    "heapAlloc": "Heap Memory",
+    "dbSize": "Database File Size",
+    "deviceTotal": "Total Devices",
+    "pendingCommands": "Pending Commands",
+    "openAlerts": "Active Alerts",
+    "unreadNotifications": "Unread Notifications"
+  },
+  "goVersionLabel": "Go Version: {{version}}",
+  "message": {
+    "loadFailed": "Failed to load system metrics"
+  }
+}

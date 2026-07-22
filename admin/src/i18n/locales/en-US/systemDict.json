@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Dictionary Management",
+  "createButton": "New Entry",
+  "filterPlaceholder": "Filter by type",
+  "table": {
+    "dictType": "Dictionary Type",
+    "label": "Display Label",
+    "sort": "Sort Order"
+  },
+  "deleteConfirm": "Delete this dictionary entry?",
+  "modal": {
+    "editTitle": "Edit Dictionary Entry",
+    "createTitle": "New Dictionary Entry",
+    "typeExtraLocked": "Cannot be changed after creation",
+    "typeExtraHint": "e.g. command_type"
+  },
+  "message": {
+    "loadFailed": "Failed to load dictionary entries"
+  }
+}

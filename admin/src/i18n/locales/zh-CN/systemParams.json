@@ -1,0 +1,11 @@
+{
+  "pageTitle": "系统参数",
+  "description": "修改后立即生效（如请求限流阈值、离线判定宽限时间），无需重启服务。",
+  "table": {
+    "value": "值"
+  },
+  "message": {
+    "loadFailed": "加载系统参数失败",
+    "saveSuccess": "已保存并生效"
+  }
+}

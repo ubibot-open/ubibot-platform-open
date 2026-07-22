@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, Typography, Alert } from 'antd'
 import { UserOutlined, LockOutlined, ApiOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function LoginPage() {
+  const { t } = useTranslation('login')
   const { login } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export default function LoginPage() {
       await login(values.username, values.password)
       navigate('/dashboard', { replace: true })
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '登录失败，请重试')
+      setError(apiErrorMessage(e, t('loginFailed')))
     } finally {
       setSubmitting(false)
     }
@@ -38,20 +40,20 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <ApiOutlined style={{ fontSize: 28, color: '#185FA5' }} />
           <Typography.Title level={4} style={{ margin: '8px 0 0' }}>
-            UbiBot 后台
+            {t('title')}
           </Typography.Title>
         </div>
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         <Form layout="vertical" onFinish={onFinish} autoComplete="off">
-          <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="用户名" size="large" />
+          <Form.Item name="username" rules={[{ required: true, message: t('form.usernameRequired') }]}>
+            <Input prefix={<UserOutlined />} placeholder={t('form.usernamePlaceholder')} size="large" />
           </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" size="large" />
+          <Form.Item name="password" rules={[{ required: true, message: t('form.passwordRequired') }]}>
+            <Input.Password prefix={<LockOutlined />} placeholder={t('form.passwordPlaceholder')} size="large" />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
             <Button type="primary" htmlType="submit" block size="large" loading={submitting}>
-              登录
+              {t('form.submit')}
             </Button>
           </Form.Item>
         </Form>

@@ -1,0 +1,25 @@
+{
+  "pageTitle": "ファイル管理",
+  "uploadButton": "ファイルをアップロード",
+  "table": {
+    "category": "分類",
+    "filename": "ファイル名",
+    "size": "サイズ",
+    "uploadedAt": "アップロード日時"
+  },
+  "deleteConfirm": "このファイルを削除しますか？",
+  "modal": {
+    "title": "ファイルのアップロード",
+    "categoryLabel": "分類",
+    "categoryPlaceholder": "例：export / attachment",
+    "fileLabel": "ファイル",
+    "selectFileButton": "ファイルを選択",
+    "submitButton": "アップロード"
+  },
+  "message": {
+    "loadFailed": "ファイル一覧の読み込みに失敗しました",
+    "selectFileRequired": "ファイルを選択してください",
+    "uploadSuccess": "アップロードしました",
+    "uploadFailed": "アップロードに失敗しました"
+  }
+}

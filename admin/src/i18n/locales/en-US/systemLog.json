@@ -1,0 +1,12 @@
+{
+  "title": "Audit Logs",
+  "columns": {
+    "time": "Time",
+    "operator": "Operator",
+    "action": "Action",
+    "target": "Target",
+    "detail": "Detail",
+    "ip": "IP"
+  },
+  "loadFailed": "Failed to load audit logs"
+}

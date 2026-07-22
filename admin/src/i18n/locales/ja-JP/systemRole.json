@@ -1,0 +1,35 @@
+{
+  "title": "ロール管理",
+  "createButton": "ロールを新規作成",
+  "columns": {
+    "name": "名称",
+    "code": "コード",
+    "permissions": "権限",
+    "actions": "操作"
+  },
+  "noPermission": "なし",
+  "deleteConfirmTitle": "このロールを削除しますか？",
+  "modal": {
+    "createTitle": "ロールを新規作成",
+    "editTitle": "ロールを編集"
+  },
+  "form": {
+    "name": "ロール名",
+    "namePlaceholder": "例：運用オペレーター",
+    "code": "ロールコード",
+    "codeExtraEditing": "作成後はコードを変更できません",
+    "codeExtraCreating": "英字の識別子（例：operator）",
+    "permissions": "権限"
+  },
+  "permissionLabels": {
+    "deviceRead": "デバイス閲覧",
+    "deviceWrite": "デバイス管理（プローブ設定を含む）",
+    "commandWrite": "コマンド送信",
+    "alertManage": "アラート管理",
+    "systemManage": "システム管理（ロール／管理者／ログ）",
+    "all": "すべての権限"
+  },
+  "loadFailed": "ロール一覧の読み込みに失敗しました",
+  "saveFailed": "保存に失敗しました",
+  "deleteFailed": "削除に失敗しました（このロールを使用している管理者がいる可能性があります）"
+}

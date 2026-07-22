@@ -1,0 +1,12 @@
+{
+  "title": "操作日志",
+  "columns": {
+    "time": "时间",
+    "operator": "操作人",
+    "action": "动作",
+    "target": "对象",
+    "detail": "详情",
+    "ip": "IP"
+  },
+  "loadFailed": "加载操作日志失败"
+}

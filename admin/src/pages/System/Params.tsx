@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, Input, Table, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useTranslation } from 'react-i18next'
 import { listSystemParams, setSystemParam, type SystemParam } from '../../api/param'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function ParamsPage() {
+  const { t } = useTranslation('systemParams')
   const [rows, setRows] = useState<SystemParam[]>([])
   const [loading, setLoading] = useState(false)
   const [edits, setEdits] = useState<Record<string, string>>({})
@@ -16,7 +18,7 @@ export default function ParamsPage() {
       const res = await listSystemParams()
       setRows(res.list)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载系统参数失败')
+      message.error(apiErrorMessage(e, t('message.loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -31,10 +33,10 @@ export default function ParamsPage() {
     setSavingKey(p.key)
     try {
       await setSystemParam(p.key, value, p.description)
-      message.success('已保存并生效')
+      message.success(t('message.saveSuccess'))
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '保存失败')
+      message.error(apiErrorMessage(e, t('common:saveFailed')))
     } finally {
       setSavingKey(null)
     }
@@ -42,9 +44,9 @@ export default function ParamsPage() {
 
   const columns: ColumnsType<SystemParam> = [
     { title: 'Key', dataIndex: 'key', width: 220 },
-    { title: '说明', dataIndex: 'description' },
+    { title: t('common:description'), dataIndex: 'description' },
     {
-      title: '值',
+      title: t('table.value'),
       dataIndex: 'value',
       width: 220,
       render: (v: string, p) => (
@@ -55,11 +57,11 @@ export default function ParamsPage() {
       ),
     },
     {
-      title: '操作',
+      title: t('common:actions'),
       width: 90,
       render: (_, p) => (
         <Button size="small" type="primary" loading={savingKey === p.key} onClick={() => onSave(p)}>
-          保存
+          {t('common:save')}
         </Button>
       ),
     },
@@ -68,11 +70,9 @@ export default function ParamsPage() {
   return (
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>
-        系统参数
+        {t('pageTitle')}
       </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        修改后立即生效（如请求限流阈值、离线判定宽限时间），无需重启服务。
-      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">{t('description')}</Typography.Paragraph>
       <Card>
         <Table rowKey="key" columns={columns} dataSource={rows} loading={loading} pagination={false} />
       </Card>

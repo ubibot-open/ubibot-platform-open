@@ -1,0 +1,133 @@
+{
+  "backToList": "返回设备列表",
+  "neverReported": "从未上报",
+  "basic": {
+    "loadFailed": "加载设备详情失败",
+    "snLabel": "SN",
+    "pidLabel": "PID",
+    "statusLabel": "状态",
+    "activatedLabel": "激活状态",
+    "onlineLabel": "在线状态",
+    "ciLabel": "采集间隔",
+    "uiLabel": "上报间隔",
+    "lastSeenLabel": "最近上报",
+    "seconds": "秒",
+    "activated": { "yes": "已激活", "no": "未激活" },
+    "online": { "yes": "在线", "no": "离线" }
+  },
+  "records": {
+    "title": "最近上报数据",
+    "columns": {
+      "time": "时间",
+      "data": "数据"
+    }
+  },
+  "command": {
+    "dispatchTitle": "下发指令",
+    "historyTitle": "指令历史",
+    "form": {
+      "typeLabel": "指令类型",
+      "typeRequired": "请选择指令类型",
+      "typePlaceholder": "选择或输入指令类型",
+      "typeOptions": {
+        "reboot": "reboot（重启）",
+        "calibrate": "calibrate（校准）",
+        "setCfg": "set_cfg（更新配置）"
+      },
+      "argsLabel": "参数 (JSON，可选)",
+      "argsPlaceholder": "例如 {\"ui\": 300}",
+      "submit": "下发指令"
+    },
+    "argsInvalidJson": "指令参数必须是合法 JSON",
+    "dispatchSuccess": "指令已下发，等待设备下次上报确认",
+    "dispatchFailed": "下发失败",
+    "columns": {
+      "id": "指令ID",
+      "type": "类型",
+      "args": "参数",
+      "status": "状态",
+      "createdAt": "下发时间"
+    },
+    "status": {
+      "pending": "待确认",
+      "acked": "已确认",
+      "nacked": "执行失败"
+    }
+  },
+  "probe": {
+    "title": "探头自定义数据读取",
+    "loadFailed": "加载探头配置失败",
+    "paramsInvalidJson": "探头参数必须是合法 JSON",
+    "upsertSuccess": "探头配置已下发，等待设备确认",
+    "upsertFailed": "配置探头失败",
+    "removeSuccess": "已请求删除探头，等待设备确认",
+    "removeFailed": "删除探头失败",
+    "deleteConfirm": "确认删除该探头？",
+    "form": {
+      "pidRequired": "探头ID",
+      "pidPlaceholder": "探头ID (pid)",
+      "keyPlaceholder": "字段名 (key)",
+      "ifaceRequired": "接口",
+      "ifacePlaceholder": "接口",
+      "protoRequired": "协议",
+      "protoPlaceholder": "协议",
+      "paramsPlaceholder": "其它参数 JSON，如 {\"addr\":1,\"fc\":3,\"reg\":0}",
+      "submit": "下发配置"
+    },
+    "columns": {
+      "ifaceProto": "接口/协议",
+      "params": "参数",
+      "status": "状态",
+      "actions": "操作"
+    },
+    "status": {
+      "pending": "待生效",
+      "applied": "已生效",
+      "failed": "失败",
+      "removing": "删除中"
+    }
+  },
+  "alert": {
+    "title": "阈值告警规则",
+    "loadFailed": "加载告警规则失败",
+    "createSuccess": "告警规则已创建",
+    "createFailed": "创建告警规则失败",
+    "deleteConfirm": "确认删除该规则？",
+    "form": {
+      "fieldRequired": "字段名",
+      "fieldPlaceholder": "字段名，如 temperature",
+      "opRequired": "比较符",
+      "thresholdRequired": "阈值",
+      "thresholdPlaceholder": "阈值"
+    },
+    "columns": {
+      "field": "字段",
+      "condition": "条件",
+      "actions": "操作"
+    }
+  },
+  "ota": {
+    "title": "固件升级 (OTA)",
+    "loadFailed": "加载OTA状态失败",
+    "selectPlaceholder": "选择固件版本",
+    "dispatchButton": "下发升级",
+    "cancelButton": "取消升级",
+    "selectFirmwareRequired": "请选择固件",
+    "dispatchSuccess": "已下发升级指令",
+    "dispatchFailed": "下发失败",
+    "cancelSuccess": "已请求取消升级",
+    "cancelFailed": "取消失败",
+    "targetVersionLabel": "目标版本 {{version}}",
+    "noTask": "该设备暂无升级任务",
+    "state": {
+      "pending": "待开始",
+      "downloading": "下载中",
+      "verifying": "校验中",
+      "flashing": "烧录中",
+      "rebooting": "重启中",
+      "success": "升级成功",
+      "failed": "升级失败",
+      "rolled_back": "已回滚"
+    }
+  }
+}

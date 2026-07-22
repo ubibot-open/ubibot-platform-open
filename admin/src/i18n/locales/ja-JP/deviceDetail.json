@@ -1,0 +1,133 @@
+{
+  "backToList": "デバイス一覧に戻る",
+  "neverReported": "未報告",
+  "basic": {
+    "loadFailed": "デバイス詳細の読み込みに失敗しました",
+    "snLabel": "SN",
+    "pidLabel": "PID",
+    "statusLabel": "状態",
+    "activatedLabel": "有効化状態",
+    "onlineLabel": "接続状態",
+    "ciLabel": "収集間隔",
+    "uiLabel": "アップロード間隔",
+    "lastSeenLabel": "最終報告",
+    "seconds": "秒",
+    "activated": { "yes": "有効化済み", "no": "未有効化" },
+    "online": { "yes": "オンライン", "no": "オフライン" }
+  },
+  "records": {
+    "title": "直近の報告データ",
+    "columns": {
+      "time": "時刻",
+      "data": "データ"
+    }
+  },
+  "command": {
+    "dispatchTitle": "コマンド送信",
+    "historyTitle": "コマンド履歴",
+    "form": {
+      "typeLabel": "コマンドタイプ",
+      "typeRequired": "コマンドタイプを選択してください",
+      "typePlaceholder": "コマンドタイプを選択または入力",
+      "typeOptions": {
+        "reboot": "reboot（再起動）",
+        "calibrate": "calibrate（キャリブレーション）",
+        "setCfg": "set_cfg（設定更新）"
+      },
+      "argsLabel": "パラメータ (JSON、任意)",
+      "argsPlaceholder": "例: {\"ui\": 300}",
+      "submit": "コマンドを送信"
+    },
+    "argsInvalidJson": "コマンドパラメータは正しいJSON形式で入力してください",
+    "dispatchSuccess": "コマンドを送信しました。デバイスの次回報告時に確認されます",
+    "dispatchFailed": "送信に失敗しました",
+    "columns": {
+      "id": "コマンドID",
+      "type": "タイプ",
+      "args": "パラメータ",
+      "status": "状態",
+      "createdAt": "送信時刻"
+    },
+    "status": {
+      "pending": "確認待ち",
+      "acked": "確認済み",
+      "nacked": "実行失敗"
+    }
+  },
+  "probe": {
+    "title": "プローブカスタムデータ読み取り",
+    "loadFailed": "プローブ設定の読み込みに失敗しました",
+    "paramsInvalidJson": "プローブパラメータは正しいJSON形式で入力してください",
+    "upsertSuccess": "プローブ設定を送信しました。デバイスの確認をお待ちください",
+    "upsertFailed": "プローブの設定に失敗しました",
+    "removeSuccess": "プローブの削除をリクエストしました。デバイスの確認をお待ちください",
+    "removeFailed": "プローブの削除に失敗しました",
+    "deleteConfirm": "このプローブを削除しますか？",
+    "form": {
+      "pidRequired": "プローブID",
+      "pidPlaceholder": "プローブID (pid)",
+      "keyPlaceholder": "フィールド名 (key)",
+      "ifaceRequired": "インターフェース",
+      "ifacePlaceholder": "インターフェース",
+      "protoRequired": "プロトコル",
+      "protoPlaceholder": "プロトコル",
+      "paramsPlaceholder": "その他のパラメータ (JSON)、例: {\"addr\":1,\"fc\":3,\"reg\":0}",
+      "submit": "設定を送信"
+    },
+    "columns": {
+      "ifaceProto": "インターフェース/プロトコル",
+      "params": "パラメータ",
+      "status": "状態",
+      "actions": "操作"
+    },
+    "status": {
+      "pending": "反映待ち",
+      "applied": "反映済み",
+      "failed": "失敗",
+      "removing": "削除中"
+    }
+  },
+  "alert": {
+    "title": "しきい値アラートルール",
+    "loadFailed": "アラートルールの読み込みに失敗しました",
+    "createSuccess": "アラートルールを作成しました",
+    "createFailed": "アラートルールの作成に失敗しました",
+    "deleteConfirm": "このルールを削除しますか？",
+    "form": {
+      "fieldRequired": "フィールド名",
+      "fieldPlaceholder": "フィールド名、例: temperature",
+      "opRequired": "比較演算子",
+      "thresholdRequired": "しきい値",
+      "thresholdPlaceholder": "しきい値"
+    },
+    "columns": {
+      "field": "フィールド",
+      "condition": "条件",
+      "actions": "操作"
+    }
+  },
+  "ota": {
+    "title": "ファームウェアアップグレード (OTA)",
+    "loadFailed": "OTAステータスの読み込みに失敗しました",
+    "selectPlaceholder": "ファームウェアバージョンを選択",
+    "dispatchButton": "アップグレードを送信",
+    "cancelButton": "アップグレードを取消",
+    "selectFirmwareRequired": "ファームウェアを選択してください",
+    "dispatchSuccess": "アップグレード指令を送信しました",
+    "dispatchFailed": "送信に失敗しました",
+    "cancelSuccess": "アップグレードの取消をリクエストしました",
+    "cancelFailed": "取消に失敗しました",
+    "targetVersionLabel": "対象バージョン {{version}}",
+    "noTask": "このデバイスにはアップグレードタスクがありません",
+    "state": {
+      "pending": "開始待ち",
+      "downloading": "ダウンロード中",
+      "verifying": "検証中",
+      "flashing": "書き込み中",
+      "rebooting": "再起動中",
+      "success": "アップグレード成功",
+      "failed": "アップグレード失敗",
+      "rolled_back": "ロールバック済み"
+    }
+  }
+}

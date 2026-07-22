@@ -1,0 +1,27 @@
+{
+  "pageTitle": "Open API Keys",
+  "createButton": "New Key",
+  "description": "Used by third-party systems to call read-only open endpoints (GET /api/open/v1/...), authenticated via the X-Api-Key header.",
+  "table": {
+    "prefix": "Prefix",
+    "revoked": "Revoked",
+    "active": "Active",
+    "lastUsedAt": "Last Used",
+    "neverUsed": "Never used",
+    "revokeAction": "Revoke"
+  },
+  "revokeConfirm": "Revoke this key? It will stop working immediately.",
+  "modal": {
+    "createTitle": "New API Key",
+    "keyCreatedNotice": "The key has been created and will only be shown once. Please save it now:",
+    "gotIt": "Got it",
+    "nameLabel": "Purpose",
+    "namePlaceholder": "e.g. BI reporting integration"
+  },
+  "message": {
+    "loadFailed": "Failed to load API keys",
+    "createFailed": "Failed to create key",
+    "revokeFailed": "Operation failed",
+    "revokeSuccess": "Key revoked"
+  }
+}

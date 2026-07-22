@@ -1,0 +1,11 @@
+{
+  "brand": "UbiBot 后台",
+  "home": "首页",
+  "toggleTheme": "切换主题",
+  "notifications": "通知",
+  "noNotifications": "暂无通知",
+  "adminRole": "管理员",
+  "userMenu": {
+    "profile": "个人设置"
+  }
+}

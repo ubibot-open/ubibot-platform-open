@@ -1,0 +1,26 @@
+{
+  "title": "管理员",
+  "createButton": "新建管理员",
+  "columns": {
+    "username": "用户名",
+    "role": "角色",
+    "createdAt": "创建时间",
+    "actions": "操作"
+  },
+  "deleteConfirmTitle": "确认删除该管理员？",
+  "modal": {
+    "createTitle": "新建管理员",
+    "editTitle": "编辑管理员"
+  },
+  "form": {
+    "username": "用户名",
+    "password": "密码",
+    "passwordResetLabel": "重置密码（留空则不修改）",
+    "role": "角色",
+    "rolePlaceholder": "选择角色"
+  },
+  "usernamePasswordRequired": "用户名和密码为必填项",
+  "loadFailed": "加载管理员列表失败",
+  "saveFailed": "保存失败",
+  "deleteFailed": "删除失败"
+}

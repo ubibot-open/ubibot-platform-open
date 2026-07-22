@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Breadcrumb, Button, Badge, Dropdown, Avatar, List, Popover, Typography } from 'antd'
 import type { MenuProps } from 'antd'
+import { useTranslation } from 'react-i18next'
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -18,18 +19,17 @@ import { menuTree, type MenuNode } from '../router/menu'
 import { useThemeMode } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { listNotifications, markAllNotificationsRead, markNotificationRead, type Notification } from '../api/notification'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const { Header, Sider, Content } = Layout
 
-function toMenuItems(nodes: MenuNode[]): MenuProps['items'] {
+function toMenuItems(nodes: MenuNode[], tMenu: (key: string) => string): MenuProps['items'] {
   return nodes.map((node) =>
     node.children
-      ? { key: node.key, icon: node.icon, label: node.label, children: toMenuItems(node.children) }
-      : { key: node.key, icon: node.icon, label: node.label },
+      ? { key: node.key, icon: node.icon, label: tMenu(node.label), children: toMenuItems(node.children, tMenu) }
+      : { key: node.key, icon: node.icon, label: tMenu(node.label) },
   )
 }
-
-const menuItems = toMenuItems(menuTree)
 
 function findTrail(pathname: string): MenuNode[] {
   for (const top of menuTree) {
@@ -42,11 +42,15 @@ function findTrail(pathname: string): MenuNode[] {
 }
 
 export default function AppLayout() {
+  const { t } = useTranslation('layout')
+  const { t: tMenu } = useTranslation('menu')
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { mode, toggle } = useThemeMode()
   const { username, logout } = useAuth()
+
+  const menuItems = useMemo(() => toMenuItems(menuTree, tMenu), [tMenu])
 
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
@@ -87,9 +91,9 @@ export default function AppLayout() {
   const defaultOpenKeys = trail.length > 1 ? [trail[0].key] : []
 
   const userMenuItems: MenuProps['items'] = [
-    { key: 'profile', icon: <SettingOutlined />, label: '个人设置' },
+    { key: 'profile', icon: <SettingOutlined />, label: t('userMenu.profile') },
     { type: 'divider' },
-    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true },
+    { key: 'logout', icon: <LogoutOutlined />, label: t('common:logout'), danger: true },
   ]
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -116,7 +120,7 @@ export default function AppLayout() {
           }}
         >
           <ApiOutlined />
-          {!collapsed && <span>UbiBot 后台</span>}
+          {!collapsed && <span>{t('brand')}</span>}
         </div>
         <Menu
           mode="inline"
@@ -149,13 +153,14 @@ export default function AppLayout() {
           />
           <Breadcrumb
             style={{ marginLeft: 12, flex: 1 }}
-            items={[{ title: '首页' }, ...trail.map((n) => ({ title: n.label }))]}
+            items={[{ title: t('home') }, ...trail.map((n) => ({ title: tMenu(n.label) }))]}
           />
+          <LanguageSwitcher />
           <Button
             type="text"
             icon={mode === 'dark' ? <BulbFilled /> : <BulbOutlined />}
             onClick={toggle}
-            aria-label="切换主题"
+            aria-label={t('toggleTheme')}
           />
           <Popover
             placement="bottomRight"
@@ -165,7 +170,7 @@ export default function AppLayout() {
               <List
                 style={{ width: 300, maxHeight: 360, overflowY: 'auto' }}
                 size="small"
-                locale={{ emptyText: '暂无通知' }}
+                locale={{ emptyText: t('noNotifications') }}
                 dataSource={notifications}
                 renderItem={(item) => (
                   <List.Item onClick={() => onClickNotification(item.id)} style={{ cursor: 'pointer' }}>
@@ -188,7 +193,7 @@ export default function AppLayout() {
                   <BellOutlined />
                 </Badge>
               }
-              aria-label="通知"
+              aria-label={t('notifications')}
             />
           </Popover>
           <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={['click']}>
@@ -196,7 +201,7 @@ export default function AppLayout() {
               <Avatar size={28} icon={<UserOutlined />} />
               <div style={{ lineHeight: 1.3 }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{username}</div>
-                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }}>管理员</div>
+                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.45)' }}>{t('adminRole')}</div>
               </div>
               <DownOutlined style={{ fontSize: 11 }} />
             </div>

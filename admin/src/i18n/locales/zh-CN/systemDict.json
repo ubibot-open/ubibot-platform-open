@@ -1,0 +1,20 @@
+{
+  "pageTitle": "字典管理",
+  "createButton": "新建字典项",
+  "filterPlaceholder": "按类型筛选",
+  "table": {
+    "dictType": "字典类型",
+    "label": "显示名称",
+    "sort": "排序"
+  },
+  "deleteConfirm": "确认删除该字典项？",
+  "modal": {
+    "editTitle": "编辑字典项",
+    "createTitle": "新建字典项",
+    "typeExtraLocked": "创建后不可修改",
+    "typeExtraHint": "如 command_type"
+  },
+  "message": {
+    "loadFailed": "加载字典失败"
+  }
+}

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { Button, Card, DatePicker, Select, Space, Table, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { Dayjs } from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import { getDeviceRecords, listDevices, type Device, type DeviceRecord } from '../../api/device'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function MonitorPage() {
+  const { t } = useTranslation('monitor')
   const [devices, setDevices] = useState<Device[]>([])
   const [deviceId, setDeviceId] = useState<number | null>(null)
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>([dayjs().subtract(1, 'day'), dayjs()])
@@ -20,7 +22,7 @@ export default function MonitorPage() {
         setDevices(res.list)
         if (res.list.length > 0) setDeviceId(res.list[0].id)
       })
-      .catch((e) => message.error(e instanceof ApiError ? e.message : '加载设备列表失败'))
+      .catch((e) => message.error(apiErrorMessage(e, t('messages.loadDevicesFailed'))))
   }, [])
 
   const query = async (p = 1) => {
@@ -37,7 +39,7 @@ export default function MonitorPage() {
       setTotal(res.total)
       setPage(p)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '查询失败')
+      message.error(apiErrorMessage(e, t('messages.queryFailed')))
     } finally {
       setLoading(false)
     }
@@ -51,7 +53,7 @@ export default function MonitorPage() {
   const fields = Array.from(new Set(records.flatMap((r) => Object.keys(r.d)))).sort()
 
   const columns: ColumnsType<DeviceRecord> = [
-    { title: '时间', dataIndex: 'ts', width: 200, render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    { title: t('columns.time'), dataIndex: 'ts', width: 200, render: (ts: number) => new Date(ts * 1000).toLocaleString() },
     ...fields.map((f) => ({
       title: f,
       key: f,
@@ -65,13 +67,13 @@ export default function MonitorPage() {
   return (
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>
-        数据监控
+        {t('title')}
       </Typography.Title>
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
             style={{ width: 240 }}
-            placeholder="选择设备"
+            placeholder={t('devicePlaceholder')}
             value={deviceId}
             onChange={setDeviceId}
             options={devices.map((d) => ({ value: d.id, label: d.name || d.sn }))}
@@ -84,7 +86,7 @@ export default function MonitorPage() {
             onChange={(v) => setRange(v as [Dayjs, Dayjs] | null)}
           />
           <Button type="primary" onClick={() => query(1)} loading={loading}>
-            查询
+            {t('queryButton')}
           </Button>
         </Space>
         <Table

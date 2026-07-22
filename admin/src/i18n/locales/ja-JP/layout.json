@@ -1,0 +1,11 @@
+{
+  "brand": "UbiBot 管理画面",
+  "home": "ホーム",
+  "toggleTheme": "テーマ切替",
+  "notifications": "通知",
+  "noNotifications": "通知はありません",
+  "adminRole": "管理者",
+  "userMenu": {
+    "profile": "個人設定"
+  }
+}

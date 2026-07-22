@@ -1,0 +1,35 @@
+{
+  "title": "角色管理",
+  "createButton": "新建角色",
+  "columns": {
+    "name": "名称",
+    "code": "代码",
+    "permissions": "权限",
+    "actions": "操作"
+  },
+  "noPermission": "无",
+  "deleteConfirmTitle": "确认删除该角色？",
+  "modal": {
+    "createTitle": "新建角色",
+    "editTitle": "编辑角色"
+  },
+  "form": {
+    "name": "角色名称",
+    "namePlaceholder": "如：运维操作员",
+    "code": "角色代码",
+    "codeExtraEditing": "代码创建后不可修改",
+    "codeExtraCreating": "英文标识，如 operator",
+    "permissions": "权限"
+  },
+  "permissionLabels": {
+    "deviceRead": "设备查看",
+    "deviceWrite": "设备管理（含探头配置）",
+    "commandWrite": "指令下发",
+    "alertManage": "告警管理",
+    "systemManage": "系统管理（角色/管理员/日志）",
+    "all": "全部权限"
+  },
+  "loadFailed": "加载角色列表失败",
+  "saveFailed": "保存失败",
+  "deleteFailed": "删除失败（可能仍有管理员使用该角色）"
+}

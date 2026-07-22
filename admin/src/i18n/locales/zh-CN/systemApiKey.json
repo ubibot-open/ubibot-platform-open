@@ -1,0 +1,27 @@
+{
+  "pageTitle": "开放API密钥",
+  "createButton": "新建Key",
+  "description": "用于第三方系统调用只读开放接口（GET /api/open/v1/...），通过 X-Api-Key 请求头鉴权。",
+  "table": {
+    "prefix": "前缀",
+    "revoked": "已吊销",
+    "active": "有效",
+    "lastUsedAt": "最近使用",
+    "neverUsed": "从未使用",
+    "revokeAction": "吊销"
+  },
+  "revokeConfirm": "确认吊销该Key？吊销后立即失效。",
+  "modal": {
+    "createTitle": "新建API Key",
+    "keyCreatedNotice": "Key已创建，只会显示这一次，请立即保存：",
+    "gotIt": "知道了",
+    "nameLabel": "用途说明",
+    "namePlaceholder": "如：BI报表系统集成"
+  },
+  "message": {
+    "loadFailed": "加载API Key列表失败",
+    "createFailed": "创建失败",
+    "revokeFailed": "操作失败",
+    "revokeSuccess": "已吊销"
+  }
+}

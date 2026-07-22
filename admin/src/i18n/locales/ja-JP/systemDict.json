@@ -1,0 +1,20 @@
+{
+  "pageTitle": "辞書管理",
+  "createButton": "辞書項目を新規作成",
+  "filterPlaceholder": "種別で絞り込み",
+  "table": {
+    "dictType": "辞書種別",
+    "label": "表示名",
+    "sort": "並び順"
+  },
+  "deleteConfirm": "この辞書項目を削除しますか？",
+  "modal": {
+    "editTitle": "辞書項目の編集",
+    "createTitle": "辞書項目の新規作成",
+    "typeExtraLocked": "作成後は変更できません",
+    "typeExtraHint": "例：command_type"
+  },
+  "message": {
+    "loadFailed": "辞書の読み込みに失敗しました"
+  }
+}

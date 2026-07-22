@@ -1,0 +1,19 @@
+{
+  "pageTitle": "系统监控",
+  "refreshNote": "每10秒自动刷新。",
+  "uptimeFormat": "{{d}}天{{h}}时{{m}}分",
+  "stats": {
+    "uptime": "运行时长",
+    "goroutines": "Goroutine 数",
+    "heapAlloc": "堆内存占用",
+    "dbSize": "数据库文件大小",
+    "deviceTotal": "设备总数",
+    "pendingCommands": "待确认指令",
+    "openAlerts": "进行中告警",
+    "unreadNotifications": "未读通知"
+  },
+  "goVersionLabel": "Go 版本：{{version}}",
+  "message": {
+    "loadFailed": "加载系统指标失败"
+  }
+}

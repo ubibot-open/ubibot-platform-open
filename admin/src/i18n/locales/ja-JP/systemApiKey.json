@@ -1,0 +1,27 @@
+{
+  "pageTitle": "オープンAPIキー",
+  "createButton": "新規キー作成",
+  "description": "サードパーティシステムが読み取り専用のオープンAPI（GET /api/open/v1/...）を呼び出す際に使用し、X-Api-Keyヘッダーで認証します。",
+  "table": {
+    "prefix": "プレフィックス",
+    "revoked": "失効済み",
+    "active": "有効",
+    "lastUsedAt": "最終使用日時",
+    "neverUsed": "未使用",
+    "revokeAction": "失効"
+  },
+  "revokeConfirm": "このキーを失効させますか？失効後は直ちに使用できなくなります。",
+  "modal": {
+    "createTitle": "APIキーの新規作成",
+    "keyCreatedNotice": "キーが作成されました。これは一度だけ表示されるため、今すぐ保存してください：",
+    "gotIt": "了解",
+    "nameLabel": "用途の説明",
+    "namePlaceholder": "例：BIレポートシステム連携"
+  },
+  "message": {
+    "loadFailed": "APIキー一覧の読み込みに失敗しました",
+    "createFailed": "作成に失敗しました",
+    "revokeFailed": "操作に失敗しました",
+    "revokeSuccess": "キーを失効しました"
+  }
+}

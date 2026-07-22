@@ -1,0 +1,11 @@
+{
+  "title": "UbiBot Admin",
+  "loginFailed": "Login failed, please try again",
+  "form": {
+    "usernameRequired": "Please enter your username",
+    "usernamePlaceholder": "Username",
+    "passwordRequired": "Please enter your password",
+    "passwordPlaceholder": "Password",
+    "submit": "Log In"
+  }
+}

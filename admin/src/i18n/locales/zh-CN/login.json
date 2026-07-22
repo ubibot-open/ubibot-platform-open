@@ -1,0 +1,11 @@
+{
+  "title": "UbiBot 后台",
+  "loginFailed": "登录失败，请重试",
+  "form": {
+    "usernameRequired": "请输入用户名",
+    "usernamePlaceholder": "用户名",
+    "passwordRequired": "请输入密码",
+    "passwordPlaceholder": "密码",
+    "submit": "登录"
+  }
+}

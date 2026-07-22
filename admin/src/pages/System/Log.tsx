@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Card, Table, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useTranslation } from 'react-i18next'
 import { listAuditLogs, type AuditLog } from '../../api/rbac'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function AuditLogPage() {
+  const { t } = useTranslation('systemLog')
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -18,7 +20,7 @@ export default function AuditLogPage() {
       setTotal(res.total)
       setPage(p)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载操作日志失败')
+      message.error(apiErrorMessage(e, t('loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -29,18 +31,18 @@ export default function AuditLogPage() {
   }, [])
 
   const columns: ColumnsType<AuditLog> = [
-    { title: '时间', dataIndex: 'created_at', width: 180, render: (ts: number) => new Date(ts * 1000).toLocaleString() },
-    { title: '操作人', dataIndex: 'username', width: 120 },
-    { title: '动作', dataIndex: 'action', width: 160 },
-    { title: '对象', render: (_, r) => (r.target_type ? `${r.target_type}#${r.target_id}` : '-') },
-    { title: '详情', dataIndex: 'detail' },
-    { title: 'IP', dataIndex: 'ip', width: 140 },
+    { title: t('columns.time'), dataIndex: 'created_at', width: 180, render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    { title: t('columns.operator'), dataIndex: 'username', width: 120 },
+    { title: t('columns.action'), dataIndex: 'action', width: 160 },
+    { title: t('columns.target'), render: (_, r) => (r.target_type ? `${r.target_type}#${r.target_id}` : '-') },
+    { title: t('columns.detail'), dataIndex: 'detail' },
+    { title: t('columns.ip'), dataIndex: 'ip', width: 140 },
   ]
 
   return (
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>
-        操作日志
+        {t('title')}
       </Typography.Title>
       <Card>
         <Table

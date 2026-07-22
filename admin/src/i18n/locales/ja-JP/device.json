@@ -1,0 +1,44 @@
+{
+  "title": "デバイス管理",
+  "loadFailed": "デバイス一覧の読み込みに失敗しました",
+  "detail": "詳細",
+  "neverReported": "未報告",
+  "columns": {
+    "id": "ID",
+    "name": "デバイス名",
+    "sn": "SN",
+    "pid": "PID",
+    "status": "状態",
+    "activated": "有効化状態",
+    "online": "オンライン",
+    "interval": "収集/アップロード間隔(秒)",
+    "lastSeen": "最終報告",
+    "actions": "操作"
+  },
+  "activated": {
+    "yes": "有効化済み",
+    "no": "未有効化"
+  },
+  "online": {
+    "yes": "オンライン",
+    "no": "オフライン"
+  },
+  "create": {
+    "button": "デバイスを新規作成",
+    "modalTitle": "デバイスを新規作成",
+    "success": "デバイスを作成しました",
+    "failed": "作成に失敗しました",
+    "createdNotice": "デバイスを作成しました。デバイスシークレットはこの一度だけ表示されます。必ず記録し、デバイスに書き込んでください：",
+    "gotIt": "了解",
+    "pidLabel": "製品型番 (PID)",
+    "pidPlaceholder": "ubibot_open_dev_v1",
+    "snLabel": "デバイスシリアル番号 (SN)",
+    "snPlaceholder": "sn_ws1_20002_1",
+    "nameLabel": "デバイス名",
+    "namePlaceholder": "任意",
+    "secretLabel": "デバイスシークレット",
+    "secretExtra": "空欄の場合は自動生成されます",
+    "secretPlaceholder": "任意、空欄の場合は自動生成",
+    "submit": "作成"
+  }
+}

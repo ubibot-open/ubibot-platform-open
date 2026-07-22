@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, Select, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { useTranslation } from 'react-i18next'
 import { listAlertEvents, resolveAlertEvent, type AlertEvent } from '../../api/alert'
 import { listDevices, type Device } from '../../api/device'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
-const typeTag: Record<AlertEvent['type'], { color: string; text: string }> = {
-  threshold: { color: 'orange', text: '阈值告警' },
-  offline: { color: 'red', text: '离线告警' },
+const typeColor: Record<AlertEvent['type'], string> = {
+  threshold: 'orange',
+  offline: 'red',
 }
 
 export default function AlertPage() {
+  const { t } = useTranslation('alert')
   const [devices, setDevices] = useState<Device[]>([])
   const [deviceId, setDeviceId] = useState<number | undefined>(undefined)
   const [status, setStatus] = useState<string>('open')
@@ -22,7 +24,7 @@ export default function AlertPage() {
   useEffect(() => {
     listDevices(1, 200)
       .then((res) => setDevices(res.list))
-      .catch((e) => message.error(e instanceof ApiError ? e.message : '加载设备列表失败'))
+      .catch((e) => message.error(apiErrorMessage(e, t('messages.loadDevicesFailed'))))
   }, [])
 
   const load = async (p = 1) => {
@@ -33,7 +35,7 @@ export default function AlertPage() {
       setTotal(res.total)
       setPage(p)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载告警列表失败')
+      message.error(apiErrorMessage(e, t('messages.loadListFailed')))
     } finally {
       setLoading(false)
     }
@@ -47,45 +49,45 @@ export default function AlertPage() {
   const onResolve = async (id: number) => {
     try {
       await resolveAlertEvent(id)
-      message.success('已标记为已处理')
+      message.success(t('messages.resolveSuccess'))
       load(page)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '操作失败')
+      message.error(apiErrorMessage(e, t('messages.resolveFailed')))
     }
   }
 
   const columns: ColumnsType<AlertEvent> = [
-    { title: '设备', dataIndex: 'device_name' },
-    { title: '类型', dataIndex: 'type', width: 100, render: (t: AlertEvent['type']) => (
-      <Tag color={typeTag[t].color}>{typeTag[t].text}</Tag>
+    { title: t('columns.device'), dataIndex: 'device_name' },
+    { title: t('columns.type'), dataIndex: 'type', width: 100, render: (tp: AlertEvent['type']) => (
+      <Tag color={typeColor[tp]}>{t(`type.${tp}`)}</Tag>
     ) },
-    { title: '详情', dataIndex: 'message' },
+    { title: t('columns.detail'), dataIndex: 'message' },
     {
-      title: '状态',
+      title: t('columns.status'),
       dataIndex: 'status',
       width: 100,
       render: (s: AlertEvent['status']) =>
-        s === 'open' ? <Tag color="red">进行中</Tag> : <Tag color="green">已处理</Tag>,
+        s === 'open' ? <Tag color="red">{t('status.open')}</Tag> : <Tag color="green">{t('status.resolved')}</Tag>,
     },
-    { title: '触发时间', dataIndex: 'triggered_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    { title: t('columns.triggeredAt'), dataIndex: 'triggered_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
     {
-      title: '操作',
+      title: t('columns.actions'),
       width: 90,
       render: (_, r) =>
-        r.status === 'open' ? <Button size="small" onClick={() => onResolve(r.id)}>标记处理</Button> : '-',
+        r.status === 'open' ? <Button size="small" onClick={() => onResolve(r.id)}>{t('resolveButton')}</Button> : '-',
     },
   ]
 
   return (
     <div>
       <Typography.Title level={4} style={{ marginTop: 0 }}>
-        告警中心
+        {t('title')}
       </Typography.Title>
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
             style={{ width: 200 }}
-            placeholder="按设备筛选"
+            placeholder={t('filters.devicePlaceholder')}
             allowClear
             value={deviceId}
             onChange={setDeviceId}
@@ -98,9 +100,9 @@ export default function AlertPage() {
             value={status}
             onChange={setStatus}
             options={[
-              { value: 'open', label: '进行中' },
-              { value: 'resolved', label: '已处理' },
-              { value: '', label: '全部' },
+              { value: 'open', label: t('status.open') },
+              { value: 'resolved', label: t('status.resolved') },
+              { value: '', label: t('status.all') },
             ]}
           />
         </Space>

@@ -1,0 +1,12 @@
+{
+  "title": "Data Monitor",
+  "devicePlaceholder": "Select device",
+  "queryButton": "Query",
+  "columns": {
+    "time": "Time"
+  },
+  "messages": {
+    "loadDevicesFailed": "Failed to load device list",
+    "queryFailed": "Query failed"
+  }
+}

@@ -19,6 +19,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { PlusOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import {
   createScheduledTask,
   deleteScheduledTask,
@@ -27,9 +28,10 @@ import {
   type ScheduledTask,
 } from '../../api/schedule'
 import { listDevices, type Device } from '../../api/device'
-import { ApiError } from '../../api/client'
+import { apiErrorMessage } from '../../api/errors'
 
 export default function SchedulePage() {
+  const { t } = useTranslation('systemSchedule')
   const [rows, setRows] = useState<ScheduledTask[]>([])
   const [devices, setDevices] = useState<Device[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,7 +48,7 @@ export default function SchedulePage() {
       setRows(t.list)
       setDevices(d.list)
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '加载定时任务失败')
+      message.error(apiErrorMessage(e, t('message.loadFailed')))
     } finally {
       setLoading(false)
     }
@@ -107,11 +109,11 @@ export default function SchedulePage() {
       } else {
         await createScheduledTask(input)
       }
-      message.success('保存成功')
+      message.success(t('common:saveSuccess'))
       setOpen(false)
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '保存失败')
+      message.error(apiErrorMessage(e, t('common:saveFailed')))
     } finally {
       setSubmitting(false)
     }
@@ -120,36 +122,42 @@ export default function SchedulePage() {
   const onDelete = async (id: number) => {
     try {
       await deleteScheduledTask(id)
-      message.success('已删除')
+      message.success(t('common:deleteSuccess'))
       load()
     } catch (e) {
-      message.error(e instanceof ApiError ? e.message : '删除失败')
+      message.error(apiErrorMessage(e, t('common:deleteFailed')))
     }
   }
 
-  const deviceName = (id: number) => (id === 0 ? '全部启用设备' : devices.find((d) => d.id === id)?.name || `#${id}`)
+  const deviceName = (id: number) => (id === 0 ? t('allEnabledDevices') : devices.find((d) => d.id === id)?.name || `#${id}`)
 
   const columns: ColumnsType<ScheduledTask> = [
-    { title: '名称', dataIndex: 'name' },
-    { title: '目标设备', render: (_, r) => deviceName(r.device_id) },
-    { title: '指令类型', dataIndex: 'cmd_type' },
+    { title: t('common:name'), dataIndex: 'name' },
+    { title: t('table.targetDevice'), render: (_, r) => deviceName(r.device_id) },
+    { title: t('table.cmdType'), dataIndex: 'cmd_type' },
     {
-      title: '调度',
+      title: t('table.schedule'),
       render: (_, r) =>
         r.schedule_type === 'interval'
-          ? `每 ${r.interval_seconds} 秒`
-          : `每天 ${String(Math.floor((r.daily_at_minute ?? 0) / 60)).padStart(2, '0')}:${String((r.daily_at_minute ?? 0) % 60).padStart(2, '0')}`,
+          ? t('table.intervalDisplay', { seconds: r.interval_seconds })
+          : t('table.dailyDisplay', {
+              time: `${String(Math.floor((r.daily_at_minute ?? 0) / 60)).padStart(2, '0')}:${String((r.daily_at_minute ?? 0) % 60).padStart(2, '0')}`,
+            }),
     },
-    { title: '状态', dataIndex: 'enabled', render: (v: boolean) => (v ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
-    { title: '下次执行', dataIndex: 'next_run_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
     {
-      title: '操作',
+      title: t('common:status'),
+      dataIndex: 'enabled',
+      render: (v: boolean) => (v ? <Tag color="green">{t('common:enabled')}</Tag> : <Tag>{t('common:disabled')}</Tag>),
+    },
+    { title: t('table.nextRunAt'), dataIndex: 'next_run_at', render: (ts: number) => new Date(ts * 1000).toLocaleString() },
+    {
+      title: t('common:actions'),
       width: 140,
       render: (_, r) => (
         <Space>
-          <a onClick={() => openEdit(r)}>编辑</a>
-          <Popconfirm title="确认删除该任务？" onConfirm={() => onDelete(r.id)}>
-            <a>删除</a>
+          <a onClick={() => openEdit(r)}>{t('common:edit')}</a>
+          <Popconfirm title={t('deleteConfirm')} onConfirm={() => onDelete(r.id)}>
+            <a>{t('common:delete')}</a>
           </Popconfirm>
         </Space>
       ),
@@ -160,61 +168,67 @@ export default function SchedulePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
-          定时任务
+          {t('pageTitle')}
         </Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建任务
+          {t('createButton')}
         </Button>
       </div>
       <Card>
         <Table rowKey="id" columns={columns} dataSource={rows} loading={loading} pagination={false} />
       </Card>
 
-      <Modal title={editing ? '编辑任务' : '新建任务'} open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose>
+      <Modal
+        title={editing ? t('modal.editTitle') : t('modal.createTitle')}
+        open={open}
+        onCancel={() => setOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" onFinish={onSubmit}>
-          <Form.Item name="name" label="任务名称" rules={[{ required: true }]}>
-            <Input placeholder="如：每晚重启" />
+          <Form.Item name="name" label={t('modal.nameLabel')} rules={[{ required: true }]}>
+            <Input placeholder={t('modal.namePlaceholder')} />
           </Form.Item>
-          <Form.Item name="device_id" label="目标设备" rules={[{ required: true }]}>
+          <Form.Item name="device_id" label={t('table.targetDevice')} rules={[{ required: true }]}>
             <Select
-              options={[{ value: 0, label: '全部启用设备' }, ...devices.map((d) => ({ value: d.id, label: d.name || d.sn }))]}
+              options={[{ value: 0, label: t('allEnabledDevices') }, ...devices.map((d) => ({ value: d.id, label: d.name || d.sn }))]}
             />
           </Form.Item>
-          <Form.Item name="cmd_type" label="指令类型" rules={[{ required: true }]}>
+          <Form.Item name="cmd_type" label={t('table.cmdType')} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: 'reboot', label: 'reboot（重启）' },
-                { value: 'calibrate', label: 'calibrate（校准）' },
+                { value: 'reboot', label: `reboot（${t('cmdType.reboot')}）` },
+                { value: 'calibrate', label: `calibrate（${t('cmdType.calibrate')}）` },
               ]}
               showSearch
             />
           </Form.Item>
-          <Form.Item name="schedule_type" label="调度方式" rules={[{ required: true }]}>
+          <Form.Item name="schedule_type" label={t('modal.scheduleTypeLabel')} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: 'interval', label: '固定间隔' },
-                { value: 'daily', label: '每天固定时刻' },
+                { value: 'interval', label: t('scheduleType.interval') },
+                { value: 'daily', label: t('scheduleType.daily') },
               ]}
               onChange={setScheduleType}
             />
           </Form.Item>
           {scheduleType === 'interval' ? (
-            <Form.Item name="interval_seconds" label="间隔秒数" rules={[{ required: true }]}>
-              <InputNumber min={60} style={{ width: '100%' }} placeholder="至少60秒" />
+            <Form.Item name="interval_seconds" label={t('modal.intervalSecondsLabel')} rules={[{ required: true }]}>
+              <InputNumber min={60} style={{ width: '100%' }} placeholder={t('modal.intervalSecondsPlaceholder')} />
             </Form.Item>
           ) : (
-            <Form.Item name="daily_at" label="每天执行时刻" rules={[{ required: true }]}>
+            <Form.Item name="daily_at" label={t('modal.dailyAtLabel')} rules={[{ required: true }]}>
               <TimePicker format="HH:mm" style={{ width: '100%' }} />
             </Form.Item>
           )}
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item name="enabled" label={t('common:enabled')} valuePropName="checked">
             <Switch />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setOpen(false)}>取消</Button>
+              <Button onClick={() => setOpen(false)}>{t('common:cancel')}</Button>
               <Button type="primary" htmlType="submit" loading={submitting}>
-                保存
+                {t('common:save')}
               </Button>
             </Space>
           </Form.Item>

@@ -1,0 +1,26 @@
+{
+  "title": "Admins",
+  "createButton": "New Admin",
+  "columns": {
+    "username": "Username",
+    "role": "Role",
+    "createdAt": "Created At",
+    "actions": "Actions"
+  },
+  "deleteConfirmTitle": "Delete this admin?",
+  "modal": {
+    "createTitle": "New Admin",
+    "editTitle": "Edit Admin"
+  },
+  "form": {
+    "username": "Username",
+    "password": "Password",
+    "passwordResetLabel": "Reset password (leave blank to keep unchanged)",
+    "role": "Role",
+    "rolePlaceholder": "Select a role"
+  },
+  "usernamePasswordRequired": "Username and password are required",
+  "loadFailed": "Failed to load admin list",
+  "saveFailed": "Save failed",
+  "deleteFailed": "Delete failed"
+}

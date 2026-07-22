@@ -20,6 +20,7 @@ import type { ReactNode } from 'react'
 
 export interface MenuNode {
   key: string
+  /** i18n key (in the "menu" namespace) for the display label — resolve with t() at render time. */
   label: string
   path: string
   icon?: ReactNode
@@ -28,29 +29,30 @@ export interface MenuNode {
 
 // Single source of truth for the sider menu, the route table, and the
 // breadcrumb — add a page by adding one entry here instead of touching
-// three places.
+// three places. `label` holds a translation key (namespace "menu"); the
+// consumer (AppLayout) resolves it with t() so it re-renders on language change.
 export const menuTree: MenuNode[] = [
-  { key: 'dashboard', label: '仪表盘', path: '/dashboard', icon: <DashboardOutlined /> },
-  { key: 'device', label: '设备管理', path: '/device', icon: <HddOutlined /> },
-  { key: 'monitor', label: '数据监控', path: '/monitor', icon: <LineChartOutlined /> },
-  { key: 'command', label: '指令下发', path: '/command', icon: <SendOutlined /> },
-  { key: 'alert', label: '告警中心', path: '/alert', icon: <BellOutlined /> },
-  { key: 'schedule', label: '定时任务', path: '/schedule', icon: <ScheduleOutlined /> },
-  { key: 'firmware', label: '固件管理', path: '/firmware', icon: <CloudUploadOutlined /> },
+  { key: 'dashboard', label: 'dashboard', path: '/dashboard', icon: <DashboardOutlined /> },
+  { key: 'device', label: 'device', path: '/device', icon: <HddOutlined /> },
+  { key: 'monitor', label: 'monitor', path: '/monitor', icon: <LineChartOutlined /> },
+  { key: 'command', label: 'command', path: '/command', icon: <SendOutlined /> },
+  { key: 'alert', label: 'alert', path: '/alert', icon: <BellOutlined /> },
+  { key: 'schedule', label: 'schedule', path: '/schedule', icon: <ScheduleOutlined /> },
+  { key: 'firmware', label: 'firmware', path: '/firmware', icon: <CloudUploadOutlined /> },
   {
     key: 'system',
-    label: '系统管理',
+    label: 'system.root',
     path: '/system',
     icon: <SettingOutlined />,
     children: [
-      { key: 'system-admin', label: '管理员', path: '/system/admin', icon: <TeamOutlined /> },
-      { key: 'system-role', label: '角色', path: '/system/role', icon: <SafetyCertificateOutlined /> },
-      { key: 'system-log', label: '操作日志', path: '/system/log', icon: <FileSearchOutlined /> },
-      { key: 'system-apikey', label: '开放API', path: '/system/apikey', icon: <KeyOutlined /> },
-      { key: 'system-files', label: '文件管理', path: '/system/files', icon: <FolderOutlined /> },
-      { key: 'system-dict', label: '字典管理', path: '/system/dict', icon: <BookOutlined /> },
-      { key: 'system-params', label: '系统参数', path: '/system/params', icon: <SlidersOutlined /> },
-      { key: 'system-monitor', label: '系统监控', path: '/system/monitor', icon: <DesktopOutlined /> },
+      { key: 'system-admin', label: 'system.admin', path: '/system/admin', icon: <TeamOutlined /> },
+      { key: 'system-role', label: 'system.role', path: '/system/role', icon: <SafetyCertificateOutlined /> },
+      { key: 'system-log', label: 'system.log', path: '/system/log', icon: <FileSearchOutlined /> },
+      { key: 'system-apikey', label: 'system.apikey', path: '/system/apikey', icon: <KeyOutlined /> },
+      { key: 'system-files', label: 'system.files', path: '/system/files', icon: <FolderOutlined /> },
+      { key: 'system-dict', label: 'system.dict', path: '/system/dict', icon: <BookOutlined /> },
+      { key: 'system-params', label: 'system.params', path: '/system/params', icon: <SlidersOutlined /> },
+      { key: 'system-monitor', label: 'system.monitor', path: '/system/monitor', icon: <DesktopOutlined /> },
     ],
   },
 ]

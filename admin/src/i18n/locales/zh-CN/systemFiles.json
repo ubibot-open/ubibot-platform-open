@@ -1,0 +1,25 @@
+{
+  "pageTitle": "文件管理",
+  "uploadButton": "上传文件",
+  "table": {
+    "category": "分类",
+    "filename": "文件名",
+    "size": "大小",
+    "uploadedAt": "上传时间"
+  },
+  "deleteConfirm": "确认删除该文件？",
+  "modal": {
+    "title": "上传文件",
+    "categoryLabel": "分类",
+    "categoryPlaceholder": "如：export / attachment",
+    "fileLabel": "文件",
+    "selectFileButton": "选择文件",
+    "submitButton": "上传"
+  },
+  "message": {
+    "loadFailed": "加载文件列表失败",
+    "selectFileRequired": "请选择文件",
+    "uploadSuccess": "已上传",
+    "uploadFailed": "上传失败"
+  }
+}

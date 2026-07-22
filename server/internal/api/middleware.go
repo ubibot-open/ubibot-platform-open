@@ -13,8 +13,69 @@ type contextKey int
 
 const adminUserContextKey contextKey = iota
 
+// adminErrCodes maps every known adminErr message text to a stable,
+// language-neutral code. The admin API intentionally does not localize
+// message text itself (see docs on i18n) -- it returns this code alongside
+// the English message, and the admin frontend translates by code, falling
+// back to the English message verbatim for any code it doesn't recognize
+// (e.g. a message passed through from err.Error() that isn't in this
+// table, which maps to the generic "error" code below).
+var adminErrCodes = map[string]string{
+	"cannot delete your own account":                       "cannot_delete_own_account",
+	"ci and ui are required":                                "ci_ui_required",
+	"device already exists or invalid input":                "device_exists_or_invalid",
+	"device not found":                                       "device_not_found",
+	"failed to store file":                                   "file_store_failed",
+	"failed to store firmware file":                          "firmware_store_failed",
+	"field and a valid op (> >= < <= ==) are required":       "invalid_field_or_operator",
+	"file is required":                                       "file_required",
+	"file not found":                                         "file_not_found",
+	"firmware not found":                                     "firmware_not_found",
+	"firmware_id is required":                                "firmware_id_required",
+	"forbidden":                                               "forbidden",
+	"internal error":                                          "internal_error",
+	"invalid id":                                              "invalid_id",
+	"invalid key":                                             "invalid_key",
+	"invalid or expired session":                              "session_invalid_or_expired",
+	"invalid or revoked api key":                              "api_key_invalid_or_revoked",
+	"invalid request body":                                    "invalid_request_body",
+	"invalid status":                                          "invalid_status",
+	"invalid upload (file too large or malformed)":            "invalid_upload",
+	"invalid username or password":                            "invalid_credentials",
+	"label is required":                                       "label_required",
+	"missing api key":                                         "api_key_missing",
+	"missing bearer token":                                    "bearer_token_missing",
+	"name and code are required":                              "name_code_required",
+	"name is required":                                        "name_required",
+	"name, cmd_type and a valid schedule are required":        "name_cmd_type_schedule_required",
+	"no ota task in progress for this device":                 "ota_task_not_in_progress",
+	"pid and sn are required":                                 "pid_sn_required",
+	"pid and version are required":                            "pid_version_required",
+	"pid is required":                                         "pid_required",
+	"pid, iface and proto are required":                       "pid_iface_proto_required",
+	"probe not found":                                         "probe_not_found",
+	"role already exists or invalid input":                    "role_exists_or_invalid",
+	"status is required":                                      "status_required",
+	"type is required":                                        "type_required",
+	"type, key and label are required":                        "type_key_label_required",
+	"username already exists or invalid input":                "username_exists_or_invalid",
+	"username and password are required":                      "username_password_required",
+	"username, password and role_id are required":             "username_password_role_required",
+	"value is required":                                       "value_required",
+}
+
+// messageCode returns the stable i18n code for msg, or the generic "error"
+// fallback for a message not in adminErrCodes (currently only reachable via
+// the one call site that passes through a dynamic err.Error()).
+func messageCode(msg string) string {
+	if code, ok := adminErrCodes[msg]; ok {
+		return code
+	}
+	return "error"
+}
+
 func adminErr(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"message": msg})
+	writeJSON(w, status, map[string]string{"code": messageCode(msg), "message": msg})
 }
 
 // RequireAdmin wraps next, checking the Authorization: Bearer <token>
