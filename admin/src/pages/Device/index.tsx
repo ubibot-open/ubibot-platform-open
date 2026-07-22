@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { createDevice, listDevices, type Device } from '../../api/device'
+import {
+  DeviceSource,
+  DeviceStatus,
+  approveDevice,
+  createDevice,
+  deleteDevice,
+  listDevices,
+  setDeviceStatus,
+  type Device,
+} from '../../api/device'
 import { apiErrorMessage } from '../../api/errors'
 
 export default function DevicePage() {
@@ -17,6 +26,8 @@ export default function DevicePage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
+  const [approvedSecret, setApprovedSecret] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<number | null>(null)
   const [form] = Form.useForm()
 
   function formatTime(ts: number | null) {
@@ -58,21 +69,100 @@ export default function DevicePage() {
     }
   }
 
+  const onApprove = async (id: number) => {
+    setBusyId(id)
+    try {
+      const dev = await approveDevice(id)
+      message.success(t('approveSuccess'))
+      setApprovedSecret(dev.secret ?? null)
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('approveFailed')))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const onReject = async (id: number) => {
+    setBusyId(id)
+    try {
+      await setDeviceStatus(id, DeviceStatus.Disabled)
+      message.success(t('rejectSuccess'))
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('rejectFailed')))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const onDisable = async (id: number) => {
+    setBusyId(id)
+    try {
+      await setDeviceStatus(id, DeviceStatus.Disabled)
+      message.success(t('disableSuccess'))
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('disableFailed')))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const onEnable = async (id: number) => {
+    setBusyId(id)
+    try {
+      await setDeviceStatus(id, DeviceStatus.Enabled)
+      message.success(t('enableSuccess'))
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('enableFailed')))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const onDelete = async (id: number) => {
+    setBusyId(id)
+    try {
+      await deleteDevice(id)
+      message.success(t('deleteSuccess'))
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('deleteFailed')))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const columns: ColumnsType<Device> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: t('columns.name'), dataIndex: 'name', render: (v: string, r) => v || r.sn },
     { title: 'SN', dataIndex: 'sn' },
     { title: 'PID', dataIndex: 'pid' },
     {
+      title: t('source.title'),
+      dataIndex: 'source',
+      width: 100,
+      render: (source: Device['source']) =>
+        source === DeviceSource.SelfRegistered ? (
+          <Tag color="purple">{t('source.selfRegistered')}</Tag>
+        ) : (
+          <Tag color="blue">{t('source.manual')}</Tag>
+        ),
+    },
+    {
       title: t('columns.status'),
       dataIndex: 'status',
-      width: 90,
-      render: (status: number) =>
-        status === 1 ? (
+      width: 100,
+      render: (status: number) => {
+        if (status === DeviceStatus.Pending) return <Tag color="gold">{t('status.pending')}</Tag>
+        return status === DeviceStatus.Enabled ? (
           <Tag color="success">{t('common:enabled')}</Tag>
         ) : (
           <Tag color="default">{t('common:disabled')}</Tag>
-        ),
+        )
+      },
     },
     {
       title: t('columns.activated'),
@@ -96,8 +186,35 @@ export default function DevicePage() {
     { title: t('columns.lastSeen'), dataIndex: 'last_seen_at', render: formatTime },
     {
       title: t('columns.actions'),
-      width: 100,
-      render: (_, r) => <a onClick={() => navigate(`/device/${r.id}`)}>{t('detail')}</a>,
+      width: 220,
+      render: (_, r) => (
+        <Space size="small" wrap>
+          <a onClick={() => navigate(`/device/${r.id}`)}>{t('detail')}</a>
+          {r.status === DeviceStatus.Pending && (
+            <>
+              <Popconfirm title={t('approveConfirmTitle')} onConfirm={() => onApprove(r.id)}>
+                <a>{t('approveButton')}</a>
+              </Popconfirm>
+              <Popconfirm title={t('rejectConfirmTitle')} onConfirm={() => onReject(r.id)}>
+                <a style={{ color: '#ff4d4f' }}>{t('rejectButton')}</a>
+              </Popconfirm>
+            </>
+          )}
+          {r.status === DeviceStatus.Enabled && (
+            <Popconfirm title={t('disableConfirmTitle')} onConfirm={() => onDisable(r.id)}>
+              <a>{t('disableButton')}</a>
+            </Popconfirm>
+          )}
+          {r.status === DeviceStatus.Disabled && <a onClick={() => onEnable(r.id)}>{t('enableButton')}</a>}
+          <Popconfirm
+            title={t('deleteConfirmTitle')}
+            description={t('deleteConfirmContent')}
+            onConfirm={() => onDelete(r.id)}
+          >
+            <a style={{ color: '#ff4d4f' }}>{t('common:delete')}</a>
+          </Popconfirm>
+        </Space>
+      ),
     },
   ]
 
@@ -123,7 +240,7 @@ export default function DevicePage() {
         rowKey="id"
         columns={columns}
         dataSource={devices}
-        loading={loading}
+        loading={loading || busyId !== null}
         pagination={{ current: page, total, pageSize: 20, onChange: load }}
       />
 
@@ -170,6 +287,23 @@ export default function DevicePage() {
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      <Modal
+        title={t('approveConfirmTitle')}
+        open={approvedSecret !== null}
+        onCancel={() => setApprovedSecret(null)}
+        footer={
+          <Button type="primary" onClick={() => setApprovedSecret(null)}>
+            {t('create.gotIt')}
+          </Button>
+        }
+        destroyOnClose
+      >
+        <Typography.Paragraph>{t('approvedNotice')}</Typography.Paragraph>
+        <Typography.Text code copyable style={{ fontSize: 14 }}>
+          {approvedSecret}
+        </Typography.Text>
       </Modal>
     </div>
   )

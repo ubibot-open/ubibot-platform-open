@@ -8,10 +8,32 @@ import "time"
 
 // Device statuses. Disabled behaves like "unknown device" to every
 // device-facing endpoint (see internal/api), so disabling one doesn't leak
-// which serials exist.
+// which serials exist. Pending is the extra state a self-registered device
+// (see DeviceSourceSelfRegistered) starts in: it also fails every
+// device-facing endpoint's Status == Enabled check exactly like Disabled
+// does, so an unapproved device can't send or receive any data either —
+// the only difference from Disabled is that an operator can still approve
+// it forward into Enabled (see store.ApproveDevice via api.ApproveDevice),
+// which also surfaces its auto-generated secret once so it can be flashed
+// into the physical device.
 const (
 	DeviceStatusEnabled  = 1
 	DeviceStatusDisabled = 2
+	DeviceStatusPending  = 3
+)
+
+// Device source channels: a manually-provisioned device is created ahead
+// of time by an operator via 设备管理 (see api.CreateDevice), who is handed
+// its secret to flash into the device out of band. A self-registered
+// device instead shows up on its own — its SN wasn't in this platform's
+// database yet when it tried to activate, so the server auto-created a
+// Pending row for it (see api.Activate / store.AutoRegisterDevice) with a
+// randomly generated secret nobody has told the physical device yet; an
+// operator must review and approve it (copying that secret over) before
+// it can do anything.
+const (
+	DeviceSourceManual         = "manual"
+	DeviceSourceSelfRegistered = "self_registered"
 )
 
 // Device is the factory-provisioned identity triple plus the
@@ -25,6 +47,10 @@ type Device struct {
 	Secret string `gorm:"size:128;not null"`
 	Name   string `gorm:"size:128"`
 	Status int    `gorm:"not null;default:1"`
+
+	// Source distinguishes how this row came to exist (DeviceSourceManual /
+	// DeviceSourceSelfRegistered) — see the const block above.
+	Source string `gorm:"size:24;not null;default:manual"`
 
 	// Activated records whether this device has ever completed the
 	// activation handshake (protocol §4) at least once — separate from

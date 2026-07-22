@@ -23,6 +23,34 @@
     "yes": "Online",
     "no": "Offline"
   },
+  "status": {
+    "pending": "Pending Approval"
+  },
+  "source": {
+    "title": "Source",
+    "manual": "Manually Added",
+    "selfRegistered": "Self-Registered"
+  },
+  "approveButton": "Approve",
+  "approveConfirmTitle": "Approve this device",
+  "approveSuccess": "Approved",
+  "approveFailed": "Action failed",
+  "approvedNotice": "This device has been approved. The device secret is shown only once — record it and flash it to the device immediately:",
+  "rejectButton": "Reject",
+  "rejectConfirmTitle": "Reject this device? Once rejected, no data from it will be processed at all.",
+  "rejectSuccess": "Rejected",
+  "rejectFailed": "Action failed",
+  "disableButton": "Disable",
+  "disableConfirmTitle": "Disable this device? Once disabled, no data from it will be processed at all.",
+  "disableSuccess": "Disabled",
+  "disableFailed": "Action failed",
+  "enableButton": "Re-enable",
+  "enableSuccess": "Re-enabled",
+  "enableFailed": "Action failed",
+  "deleteConfirmTitle": "Delete this device?",
+  "deleteConfirmContent": "This permanently deletes the device and all of its history (telemetry, commands, alerts, probe configuration, etc.) — this cannot be undone.",
+  "deleteSuccess": "Deleted",
+  "deleteFailed": "Delete failed",
   "create": {
     "button": "New Device",
     "modalTitle": "New Device",

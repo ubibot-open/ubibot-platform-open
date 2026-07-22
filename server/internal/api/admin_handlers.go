@@ -34,6 +34,7 @@ type deviceDTO struct {
 	SN         string   `json:"sn"`
 	Name       string   `json:"name"`
 	Status     int      `json:"status"`
+	Source     string   `json:"source"`
 	Activated  bool     `json:"activated"`
 	Online     bool     `json:"online"`
 	CI         int      `json:"ci"`
@@ -41,7 +42,7 @@ type deviceDTO struct {
 	FE         []string `json:"fe"`
 	LastSeenAt *int64   `json:"last_seen_at"`
 	CreatedAt  int64    `json:"created_at"`
-	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice
+	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice/ApproveDevice
 }
 
 // toDeviceDTO's Online field uses the same rule (store.IsDeviceOnline) the
@@ -60,6 +61,7 @@ func toDeviceDTO(d *model.Device, now time.Time) deviceDTO {
 		SN:        d.SN,
 		Name:      d.Name,
 		Status:    d.Status,
+		Source:    d.Source,
 		Activated: d.Activated,
 		Online:    store.IsDeviceOnline(d, now),
 		CI:        d.CI,
@@ -363,6 +365,81 @@ func (s *Server) SetDeviceStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, "device.set_status", "device", uint(id), strconv.Itoa(req.Status))
+	writeJSON(w, 200, map[string]any{"message": "ok"})
+}
+
+// ApproveDevice handles POST /api/admin/devices/{id}/approve — the
+// operator's decision to let a self-registered (Pending) device join (see
+// model.DeviceSourceSelfRegistered, api.Activate). This is the only other
+// place besides CreateDevice a device's secret is ever shown back: the
+// auto-registration that created this row picked a random one with no way
+// to tell the operator what it is out of band, so this response carries it
+// once so it can be copied into the physical device, the same "write it
+// down now" convention CreateDevice uses.
+func (s *Server) ApproveDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		adminErr(w, 400, "invalid id")
+		return
+	}
+
+	ok, err := s.Store.ApproveDevice(uint(id))
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+	if !ok {
+		// Either the device doesn't exist, or it exists but isn't Pending
+		// (already approved, disabled, or manually created) — distinguish
+		// those only to pick a sensible status code, not because either
+		// response reveals anything new.
+		if _, err := s.Store.DeviceByID(uint(id)); errors.Is(err, store.ErrNotFound) {
+			adminErr(w, 404, "device not found")
+		} else {
+			adminErr(w, 400, "device is not pending approval")
+		}
+		return
+	}
+
+	dev, err := s.Store.DeviceByID(uint(id))
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+
+	s.audit(r, "device.approve", "device", dev.ID, dev.SN)
+
+	dto := toDeviceDTO(dev, s.Now())
+	dto.Secret = dev.Secret
+	writeJSON(w, 200, dto)
+}
+
+// DeleteDevice handles DELETE /api/admin/devices/{id} — permanently
+// removes the device and every record that references it (see
+// store.DeleteDevice). Irreversible; the frontend is expected to confirm
+// with the operator before ever calling this.
+func (s *Server) DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		adminErr(w, 400, "invalid id")
+		return
+	}
+
+	dev, err := s.Store.DeviceByID(uint(id))
+	if errors.Is(err, store.ErrNotFound) {
+		adminErr(w, 404, "device not found")
+		return
+	}
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+
+	if err := s.Store.DeleteDevice(uint(id)); err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+	s.audit(r, "device.delete", "device", uint(id), dev.SN)
 	writeJSON(w, 200, map[string]any{"message": "ok"})
 }
 

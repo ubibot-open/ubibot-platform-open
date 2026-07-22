@@ -6,6 +6,7 @@ export interface Device {
   sn: string
   name: string
   status: number
+  source: DeviceSourceValue
   activated: boolean
   online: boolean
   ci: number
@@ -33,7 +34,17 @@ export interface DeviceCommand {
 export const DeviceStatus = {
   Enabled: 1,
   Disabled: 2,
+  // A self-registered device the platform hasn't approved yet (see
+  // DeviceSource.SelfRegistered) -- blocked from sending/receiving any
+  // data exactly like Disabled, until an operator calls approveDevice.
+  Pending: 3,
 } as const
+
+export const DeviceSource = {
+  Manual: 'manual',
+  SelfRegistered: 'self_registered',
+} as const
+export type DeviceSourceValue = (typeof DeviceSource)[keyof typeof DeviceSource]
 
 export function listDevices(page = 1, pageSize = 20) {
   return api.get<{ list: Device[]; total: number }>(`/api/admin/devices?page=${page}&page_size=${pageSize}`)
@@ -67,6 +78,22 @@ export function updateDeviceConfig(id: number, input: { ci: number; ui: number; 
 
 export function setDeviceStatus(id: number, status: number) {
   return api.post<{ message: string }>(`/api/admin/devices/${id}/status`, { status })
+}
+
+// approveDevice moves a Pending self-registered device to Enabled and
+// returns it with its secret populated -- the only other place besides
+// createDevice a secret is ever shown back, so the caller can flash it
+// into the physical device now (see server's ApproveDevice handler).
+export function approveDevice(id: number) {
+  return api.post<Device>(`/api/admin/devices/${id}/approve`, {})
+}
+
+// deleteDevice permanently removes the device and all of its associated
+// data (telemetry, tokens, commands, probes, alert rules/events, OTA
+// history, scheduled tasks). Irreversible -- callers must confirm with the
+// user first.
+export function deleteDevice(id: number) {
+  return api.del<{ message: string }>(`/api/admin/devices/${id}`)
 }
 
 export function dispatchCommand(id: number, input: { type: string; args?: Record<string, unknown> }) {

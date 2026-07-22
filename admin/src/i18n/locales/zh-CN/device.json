@@ -23,6 +23,34 @@
     "yes": "在线",
     "no": "离线"
   },
+  "status": {
+    "pending": "待审批"
+  },
+  "source": {
+    "title": "来源",
+    "manual": "手动添加",
+    "selfRegistered": "自主激活"
+  },
+  "approveButton": "允许",
+  "approveConfirmTitle": "允许该设备激活",
+  "approveSuccess": "已允许激活",
+  "approveFailed": "操作失败",
+  "approvedNotice": "已允许该设备激活。设备密钥只会显示这一次，请立即记录并烧录到设备中：",
+  "rejectButton": "禁止",
+  "rejectConfirmTitle": "确认禁止该设备激活？禁止后将不再处理该设备的任何数据。",
+  "rejectSuccess": "已禁止",
+  "rejectFailed": "操作失败",
+  "disableButton": "禁用",
+  "disableConfirmTitle": "确认禁用该设备？禁用后将不再处理该设备的任何数据。",
+  "disableSuccess": "已禁用",
+  "disableFailed": "操作失败",
+  "enableButton": "解除禁用",
+  "enableSuccess": "已解除禁用",
+  "enableFailed": "操作失败",
+  "deleteConfirmTitle": "确认删除该设备？",
+  "deleteConfirmContent": "将永久删除该设备及其全部历史数据（上报记录、指令、告警、探头配置等），且不可恢复。",
+  "deleteSuccess": "删除成功",
+  "deleteFailed": "删除失败",
   "create": {
     "button": "新建设备",
     "modalTitle": "新建设备",
