@@ -59,6 +59,7 @@ export default function App() {
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/firmware" element={<FirmwarePage />} />
               <Route path="/device-management" element={<Navigate to="/device" replace />} />
+              <Route path="/data-warehouse-group" element={<Navigate to="/data-warehouse" replace />} />
               <Route path="/system/admin" element={<AdminUserPage />} />
               <Route path="/system/role" element={<RolePage />} />
               <Route path="/system/log" element={<AuditLogPage />} />

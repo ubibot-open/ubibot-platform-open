@@ -18,6 +18,7 @@ import {
   SlidersOutlined,
   DesktopOutlined,
   PictureOutlined,
+  ProfileOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 
@@ -41,8 +42,19 @@ export const menuTree: MenuNode[] = [
     // (deliberately distinct from any child's path -- see findTrail in
     // AppLayout, which would otherwise short-circuit on it before matching
     // the actual child and both mis-highlight the sider and fail to expand
-    // it). App.tsx redirects /device-management to /device for anyone who
-    // ends up here via a stale link/bookmark.
+    // it). App.tsx redirects /data-warehouse-group to /data-warehouse for
+    // anyone who ends up here via a stale link/bookmark.
+    key: 'data-warehouse-group',
+    label: 'dataWarehouseGroup',
+    path: '/data-warehouse-group',
+    icon: <DatabaseOutlined />,
+    children: [
+      { key: 'data-warehouse', label: 'myData', path: '/data-warehouse', icon: <ProfileOutlined /> },
+      { key: 'monitor', label: 'monitor', path: '/monitor', icon: <LineChartOutlined /> },
+    ],
+  },
+  {
+    // Same placeholder-path rationale as data-warehouse-group above.
     key: 'device-management',
     label: 'deviceManagement',
     path: '/device-management',
@@ -54,8 +66,6 @@ export const menuTree: MenuNode[] = [
       { key: 'firmware', label: 'firmware', path: '/firmware', icon: <CloudUploadOutlined /> },
     ],
   },
-  { key: 'data-warehouse', label: 'dataWarehouse', path: '/data-warehouse', icon: <DatabaseOutlined /> },
-  { key: 'monitor', label: 'monitor', path: '/monitor', icon: <LineChartOutlined /> },
   { key: 'alert', label: 'alert', path: '/alert', icon: <BellOutlined /> },
   {
     key: 'system',
