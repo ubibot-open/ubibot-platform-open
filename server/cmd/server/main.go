@@ -17,6 +17,7 @@ import (
 	"github.com/ubibot/ubibot-platform-open/internal/auth"
 	"github.com/ubibot/ubibot-platform-open/internal/model"
 	"github.com/ubibot/ubibot-platform-open/internal/store"
+	"github.com/ubibot/ubibot-platform-open/internal/webui"
 )
 
 func main() {
@@ -53,7 +54,14 @@ func main() {
 	}
 	applyStoredParams(srv, st)
 
-	r := api.NewRouter(srv)
+	uiFS, uiBuilt, err := webui.FS()
+	if err != nil {
+		log.Fatalf("load embedded web UI: %v", err)
+	}
+	if !uiBuilt {
+		log.Printf("embedded web UI not built — serving API only. Run the frontend build (build.ps1/build.sh, or `cd admin && npm run build`) and rebuild this binary to bundle the admin UI.")
+	}
+	r := api.NewRouter(srv, uiFS, uiBuilt)
 
 	// Offline-alert detection is the absence of a report, so nothing about
 	// receiving one can trigger it — a periodic sweep is the only way to

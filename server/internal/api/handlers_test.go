@@ -50,7 +50,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	srv := api.NewServer(st)
 	env := &testEnv{srv: srv, now: time.Unix(1_700_000_000, 0), dev: dev}
 	srv.Now = func() time.Time { return env.now }
-	env.router = api.NewRouter(srv)
+	env.router = api.NewRouter(srv, nil, false)
 	return env
 }
 

@@ -1,0 +1,7 @@
+# This directory is the Vite build output target (see admin/vite.config.ts's
+# build.outDir) and internal/webui.go's go:embed source. Its real contents
+# are generated, not source -- only .gitkeep (which keeps this directory
+# non-empty for a fresh checkout, see webui.go) is tracked.
+*
+!.gitignore
+!.gitkeep

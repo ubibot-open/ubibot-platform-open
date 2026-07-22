@@ -9,7 +9,15 @@ import (
 	"fmt"
 	"sync"
 
-	"gorm.io/driver/sqlite"
+	// glebarez/sqlite is a drop-in replacement for gorm.io/driver/sqlite
+	// backed by modernc.org/sqlite -- a pure-Go SQLite implementation, not
+	// mattn/go-sqlite3's cgo bindings. That means building this server
+	// never needs a C compiler on the build machine (no MinGW/TDM-GCC
+	// version to get right), which matters a lot for the "build one
+	// portable exe" story (see internal/webui) -- cgo toolchain mismatches
+	// between Go and an installed gcc are a real, hard-to-diagnose source
+	// of "not a valid Win32 application" style failures on Windows.
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 

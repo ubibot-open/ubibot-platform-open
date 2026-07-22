@@ -2,3 +2,9 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# tsconfig.node.json is a composite project (has to emit), so `tsc -b`
+# (part of `npm run build`) compiles vite.config.ts into these right next
+# to the source on every build -- generated, not source.
+vite.config.js
+vite.config.d.ts

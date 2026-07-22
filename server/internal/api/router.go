@@ -1,7 +1,9 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/ubibot/ubibot-platform-open/internal/model"
 )
@@ -24,11 +26,35 @@ func withCORS(next http.Handler) http.Handler {
 	})
 }
 
+// spaHandler serves the embedded admin frontend build: real static assets
+// (JS/CSS/images) are served as-is, and everything else falls back to
+// index.html so client-side routes (React Router paths like
+// /data-warehouse/12) resolve correctly on a hard refresh instead of 404ing
+// against the Go server before React ever gets a chance to route them.
+func spaHandler(ui fs.FS) http.Handler {
+	fileServer := http.FileServerFS(ui)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p == "" {
+			p = "index.html"
+		}
+		if f, err := ui.Open(p); err == nil {
+			_ = f.Close()
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		http.ServeFileFS(w, r, ui, "index.html")
+	})
+}
+
 // NewRouter wires the device-facing endpoints (protocol §4/§5/§7.1) and
 // the admin API (login + device/command management) onto a stdlib
 // ServeMux, using Go 1.22's method+pattern routing ("POST /path") and
-// {name} path parameters instead of a web framework.
-func NewRouter(s *Server) http.Handler {
+// {name} path parameters instead of a web framework. ui is the embedded
+// admin frontend build (see internal/webui) — pass a nil ui / uiBuilt=false
+// to run API-only (e.g. in tests, or before the frontend has ever been
+// built), in which case nothing is mounted at "/".
+func NewRouter(s *Server, ui fs.FS, uiBuilt bool) http.Handler {
 	mux := http.NewServeMux()
 
 	// Device-facing endpoints (protocol §4/§5/§7.1) are open to anyone who
@@ -137,6 +163,15 @@ func NewRouter(s *Server) http.Handler {
 	mux.HandleFunc("GET /api/admin/system/metrics", s.RequirePermission(model.PermSystemManage, s.SystemMetrics))
 	mux.HandleFunc("GET /api/admin/dashboard/summary", s.RequireAdmin(s.DashboardSummary))
 	mux.HandleFunc("GET /api/admin/dashboard/trends", s.RequireAdmin(s.DashboardTrends))
+
+	// The embedded admin frontend, if this binary was built with one (see
+	// internal/webui) — registered last / on the catch-all "/" pattern so
+	// it never shadows any /api/... route above regardless of registration
+	// order (Go 1.22's mux prefers the most specific pattern anyway, but
+	// being last here also just reads correctly).
+	if uiBuilt {
+		mux.Handle("/", spaHandler(ui))
+	}
 
 	return withCORS(mux)
 }
