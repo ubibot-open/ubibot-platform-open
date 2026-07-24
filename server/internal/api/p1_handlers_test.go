@@ -12,8 +12,8 @@ import (
 )
 
 // createSuperAdmin seeds a super_admin role (permissions "*") and an admin
-// account under it, returning the auth header for that account — the P1
-// tests below mostly want "can this action succeed at all", not "does RBAC
+// account under it, returning the auth header for that account — most of
+// the tests below want "can this action succeed at all", not "does RBAC
 // deny it", so they authenticate as the role that always passes.
 func (e *testEnv) createSuperAdmin(t *testing.T, username, password string) map[string]string {
 	t.Helper()
@@ -36,89 +36,12 @@ func (e *testEnv) createSuperAdmin(t *testing.T, username, password string) map[
 	return map[string]string{"Authorization": "Bearer " + token}
 }
 
-func TestProbeUpsertAckAndNakFlow(t *testing.T) {
-	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
-	adminAuth := env.createSuperAdmin(t, "admin", "s3cret-pw")
-
-	// Configure a probe — this queues a set_probe(op=upsert) command and
-	// records the probe as pending.
-	rec, body := env.do(t, "POST", fmt.Sprintf("/api/admin/devices/%d/probes", env.dev.ID), map[string]any{
-		"pid": "p1", "key": "soil_temp", "iface": "rs485", "proto": "modbus",
-		"params": map[string]any{"addr": 1, "fc": 3, "reg": 0, "cnt": 1, "dtype": "int16", "scale": 0.1},
-	}, adminAuth)
-	if rec.Code != 200 {
-		t.Fatalf("upsert probe failed: %d %v", rec.Code, body)
-	}
-	probe := body["probe"].(map[string]interface{})
-	if probe["status"] != model.ProbeStatusPending {
-		t.Fatalf("expected pending probe, got %v", probe["status"])
-	}
-	cmd := body["command"].(map[string]interface{})
-	cmdID := cmd["id"].(string)
-	if cmd["type"] != "set_probe" {
-		t.Fatalf("expected a set_probe command, got %v", cmd["type"])
-	}
-
-	// The device sees the command on its next report and acks it.
-	rec, body = env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 3000, "d": map[string]any{"x": 1}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
-	if rec.Code != 200 {
-		t.Fatalf("report failed: %d %v", rec.Code, body)
-	}
-	cmds := body["cmd"].([]interface{})
-	if len(cmds) != 1 || cmds[0].(map[string]interface{})["id"] != cmdID {
-		t.Fatalf("expected the set_probe command to be delivered, got %v", body["cmd"])
-	}
-
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 3001, "d": map[string]any{"x": 2}}},
-		"ack": []string{cmdID},
-	}, map[string]string{"X-IoT-Token": deviceToken})
-
-	rec, body = env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d/probes", env.dev.ID), nil, adminAuth)
-	if rec.Code != 200 {
-		t.Fatalf("list probes failed: %d %v", rec.Code, body)
-	}
-	list := body["list"].([]interface{})
-	if len(list) != 1 || list[0].(map[string]interface{})["status"] != model.ProbeStatusApplied {
-		t.Fatalf("expected probe to be applied after ack, got %v", list)
-	}
-
-	// Remove the probe and nak the removal — it should be marked failed,
-	// not silently deleted.
-	rec, body = env.do(t, "DELETE", fmt.Sprintf("/api/admin/devices/%d/probes/p1", env.dev.ID), nil, adminAuth)
-	if rec.Code != 200 {
-		t.Fatalf("remove probe failed: %d %v", rec.Code, body)
-	}
-	removeCmdID := body["command"].(map[string]interface{})["id"].(string)
-
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 3002, "d": map[string]any{"x": 3}}},
-		"nak": []map[string]any{{"id": removeCmdID, "c": 1, "m": "register busy"}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
-
-	rec, body = env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d/probes", env.dev.ID), nil, adminAuth)
-	list = body["list"].([]interface{})
-	if len(list) != 1 {
-		t.Fatalf("expected the probe row to survive a nak'd removal, got %v", list)
-	}
-	entry := list[0].(map[string]interface{})
-	if entry["status"] != model.ProbeStatusFailed || entry["last_error"] != "register busy" {
-		t.Fatalf("expected failed status with nak reason recorded, got %v", entry)
-	}
-}
-
 func TestDeviceRecordsQuery(t *testing.T) {
 	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
 	adminAuth := env.createSuperAdmin(t, "admin", "s3cret-pw")
 
 	for _, ts := range []int64{1000, 2000, 3000} {
-		env.do(t, "POST", "/api/v1/data/report", map[string]any{
-			"did": testSN, "recs": []map[string]any{{"ts": ts, "d": map[string]any{"temperature": 20}}},
-		}, map[string]string{"X-IoT-Token": deviceToken})
+		env.do(t, "POST", "/api/v1/data/report", report(testSN, ts, map[string]any{"field1": 20}), nil)
 	}
 
 	rec, body := env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d/records?start=1500&end=2500", env.dev.ID), nil, adminAuth)
@@ -133,12 +56,9 @@ func TestDeviceRecordsQuery(t *testing.T) {
 
 func TestDeviceOnlineStatusReflectsLastSeen(t *testing.T) {
 	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
 	adminAuth := env.createSuperAdmin(t, "admin", "s3cret-pw")
 
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 20}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	env.do(t, "POST", "/api/v1/data/report", report(testSN, env.now.Unix(), map[string]any{"field1": 20}), nil)
 
 	rec, body := env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID), nil, adminAuth)
 	if rec.Code != 200 {
@@ -161,20 +81,17 @@ func TestDeviceOnlineStatusReflectsLastSeen(t *testing.T) {
 
 func TestThresholdAlertOpensAndAutoResolves(t *testing.T) {
 	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
 	adminAuth := env.createSuperAdmin(t, "admin", "s3cret-pw")
 
 	rec, body := env.do(t, "POST", fmt.Sprintf("/api/admin/devices/%d/alert-rules", env.dev.ID), map[string]any{
-		"field": "temperature", "op": ">", "threshold": 30,
+		"field": "field1", "op": ">", "threshold": 30,
 	}, adminAuth)
 	if rec.Code != 200 {
 		t.Fatalf("create alert rule failed: %d %v", rec.Code, body)
 	}
 
 	// A violating reading opens an alert event.
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 35}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	env.do(t, "POST", "/api/v1/data/report", report(testSN, env.now.Unix(), map[string]any{"field1": 35}), nil)
 
 	rec, body = env.do(t, "GET", "/api/admin/alert-events?status=open", nil, adminAuth)
 	if rec.Code != 200 {
@@ -186,9 +103,7 @@ func TestThresholdAlertOpensAndAutoResolves(t *testing.T) {
 	}
 
 	// A subsequent non-violating reading auto-resolves it.
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1001, "d": map[string]any{"temperature": 20}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	env.do(t, "POST", "/api/v1/data/report", report(testSN, env.now.Unix()+1, map[string]any{"field1": 20}), nil)
 
 	rec, body = env.do(t, "GET", "/api/admin/alert-events?status=open", nil, adminAuth)
 	list = body["list"].([]interface{})
@@ -199,13 +114,10 @@ func TestThresholdAlertOpensAndAutoResolves(t *testing.T) {
 
 func TestOfflineSweepOpensAlert(t *testing.T) {
 	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
 
 	// Report once so the device has a LastSeenAt to go stale from, then
 	// sweep far enough past it to cross the offline grace period.
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1000, "d": map[string]any{"x": 1}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	env.do(t, "POST", "/api/v1/data/report", report(testSN, env.now.Unix(), map[string]any{"field1": 1}), nil)
 
 	future := env.now.Add(1 * time.Hour)
 	if err := env.srv.Store.OfflineSweep(future); err != nil {
@@ -220,13 +132,11 @@ func TestOfflineSweepOpensAlert(t *testing.T) {
 		t.Fatalf("expected exactly one open offline alert after the sweep, got total=%d events=%v", total, events)
 	}
 
-	// Coming back online (a fresh report, still with the same live token) —
-	// advance the mocked clock to when that report actually happens, so
-	// TouchLastSeen records a LastSeenAt the next sweep will see as fresh.
+	// Coming back online (a fresh report) — advance the mocked clock to
+	// when that report actually happens, so TouchLastSeen records a
+	// LastSeenAt the next sweep will see as fresh.
 	env.now = future
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 2000, "d": map[string]any{"x": 1}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	env.do(t, "POST", "/api/v1/data/report", report(testSN, future.Unix(), map[string]any{"field1": 1}), nil)
 	if err := env.srv.Store.OfflineSweep(future); err != nil {
 		t.Fatalf("offline sweep after recovery: %v", err)
 	}
@@ -242,7 +152,7 @@ func TestOfflineSweepOpensAlert(t *testing.T) {
 func TestRBACDeniesUnpermittedAction(t *testing.T) {
 	env := newTestEnv(t)
 
-	// A role with read-only device permissions cannot create a device.
+	// A role with read-only device permissions cannot rename a device.
 	role, err := env.srv.Store.CreateRole("只读操作员", "readonly_op", []string{model.PermDeviceRead})
 	if err != nil {
 		t.Fatalf("create role: %v", err)
@@ -264,10 +174,9 @@ func TestRBACDeniesUnpermittedAction(t *testing.T) {
 		t.Fatalf("expected device:read to permit listing devices, got %d", rec.Code)
 	}
 
-	// Creating a device (device:write) must be denied.
-	rec, _ = env.do(t, "POST", "/api/admin/devices", map[string]any{
-		"pid": "p", "sn": "sn-should-not-exist",
-	}, auth)
+	// Renaming a device (device:write) must be denied.
+	rec, _ = env.do(t, "PATCH", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID),
+		map[string]any{"name": "should-not-apply"}, auth)
 	if rec.Code != 403 {
 		t.Fatalf("expected device:write to be forbidden for a read-only role, got %d", rec.Code)
 	}

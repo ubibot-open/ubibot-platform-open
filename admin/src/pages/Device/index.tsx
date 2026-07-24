@@ -2,18 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import {
-  DeviceSource,
-  DeviceStatus,
-  createDevice,
-  deleteDevice,
-  listDevices,
-  setDeviceSecret,
-  setDeviceStatus,
-  type Device,
-} from '../../api/device'
+import { DeviceStatus, deleteDevice, listDevices, renameDevice, setDeviceStatus, type Device } from '../../api/device'
 import { apiErrorMessage } from '../../api/errors'
 
 export default function DevicePage() {
@@ -23,14 +13,10 @@ export default function DevicePage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createdSecret, setCreatedSecret] = useState<string | null>(null)
-  const [secretModalId, setSecretModalId] = useState<number | null>(null)
-  const [settingSecret, setSettingSecret] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
-  const [form] = Form.useForm()
-  const [secretForm] = Form.useForm()
+  const [renameTarget, setRenameTarget] = useState<Device | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [renameForm] = Form.useForm()
 
   function formatTime(ts: number | null) {
     if (!ts) return t('neverReported')
@@ -55,50 +41,6 @@ export default function DevicePage() {
     load(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const onCreate = async (values: { pid: string; sn: string; name?: string; secret?: string }) => {
-    setCreating(true)
-    try {
-      const dev = await createDevice(values)
-      message.success(t('create.success'))
-      setCreatedSecret(dev.secret ?? null)
-      form.resetFields()
-      load(1)
-    } catch (e) {
-      message.error(apiErrorMessage(e, t('create.failed')))
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  const onSetSecret = async (values: { secret: string }) => {
-    if (secretModalId === null) return
-    setSettingSecret(true)
-    try {
-      await setDeviceSecret(secretModalId, values.secret)
-      message.success(t('setSecretSuccess'))
-      setSecretModalId(null)
-      secretForm.resetFields()
-      load()
-    } catch (e) {
-      message.error(apiErrorMessage(e, t('setSecretFailed')))
-    } finally {
-      setSettingSecret(false)
-    }
-  }
-
-  const onReject = async (id: number) => {
-    setBusyId(id)
-    try {
-      await setDeviceStatus(id, DeviceStatus.Disabled)
-      message.success(t('rejectSuccess'))
-      load()
-    } catch (e) {
-      message.error(apiErrorMessage(e, t('rejectFailed')))
-    } finally {
-      setBusyId(null)
-    }
-  }
 
   const onDisable = async (id: number) => {
     setBusyId(id)
@@ -139,44 +81,41 @@ export default function DevicePage() {
     }
   }
 
+  const openRename = (device: Device) => {
+    setRenameTarget(device)
+    renameForm.setFieldsValue({ name: device.name })
+  }
+
+  const onRename = async (values: { name: string }) => {
+    if (!renameTarget) return
+    setRenaming(true)
+    try {
+      await renameDevice(renameTarget.id, values.name)
+      message.success(t('renameSuccess'))
+      setRenameTarget(null)
+      renameForm.resetFields()
+      load()
+    } catch (e) {
+      message.error(apiErrorMessage(e, t('renameFailed')))
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   const columns: ColumnsType<Device> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: t('columns.name'), dataIndex: 'name', render: (v: string, r) => v || r.sn },
     { title: 'SN', dataIndex: 'sn' },
     { title: 'PID', dataIndex: 'pid' },
     {
-      title: t('source.title'),
-      dataIndex: 'source',
-      width: 100,
-      render: (source: Device['source']) =>
-        source === DeviceSource.SelfRegistered ? (
-          <Tag color="purple">{t('source.selfRegistered')}</Tag>
-        ) : (
-          <Tag color="blue">{t('source.manual')}</Tag>
-        ),
-    },
-    {
       title: t('columns.status'),
       dataIndex: 'status',
-      width: 120,
-      render: (status: number) => {
-        if (status === DeviceStatus.Pending) return <Tag color="gold">{t('status.pending')}</Tag>
-        return status === DeviceStatus.Enabled ? (
+      width: 100,
+      render: (status: number) =>
+        status === DeviceStatus.Enabled ? (
           <Tag color="success">{t('common:enabled')}</Tag>
         ) : (
           <Tag color="default">{t('common:disabled')}</Tag>
-        )
-      },
-    },
-    {
-      title: t('columns.activated'),
-      dataIndex: 'activated',
-      width: 90,
-      render: (activated: boolean) =>
-        activated ? (
-          <Tag color="blue">{t('activated.yes')}</Tag>
-        ) : (
-          <Tag color="default">{t('activated.no')}</Tag>
         ),
     },
     {
@@ -186,22 +125,14 @@ export default function DevicePage() {
       render: (online: boolean) =>
         online ? <Tag color="green">{t('online.yes')}</Tag> : <Tag color="default">{t('online.no')}</Tag>,
     },
-    { title: t('columns.interval'), render: (_, r) => `${r.ci} / ${r.ui}` },
     { title: t('columns.lastSeen'), dataIndex: 'last_seen_at', render: formatTime },
     {
       title: t('columns.actions'),
-      width: 260,
+      width: 220,
       render: (_, r) => (
         <Space size="small" wrap>
           <a onClick={() => navigate(`/device/${r.id}`)}>{t('detail')}</a>
-          {r.source === DeviceSource.SelfRegistered && (
-            <a onClick={() => setSecretModalId(r.id)}>{t('setSecretButton')}</a>
-          )}
-          {r.status === DeviceStatus.Pending && (
-            <Popconfirm title={t('rejectConfirmTitle')} onConfirm={() => onReject(r.id)}>
-              <a style={{ color: '#ff4d4f' }}>{t('rejectButton')}</a>
-            </Popconfirm>
-          )}
+          <a onClick={() => openRename(r)}>{t('renameButton')}</a>
           {r.status === DeviceStatus.Enabled && (
             <Popconfirm title={t('disableConfirmTitle')} onConfirm={() => onDisable(r.id)}>
               <a>{t('disableButton')}</a>
@@ -226,16 +157,6 @@ export default function DevicePage() {
         <Typography.Title level={4} style={{ margin: 0 }}>
           {t('title')}
         </Typography.Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setCreatedSecret(null)
-            setCreateOpen(true)
-          }}
-        >
-          {t('create.button')}
-        </Button>
       </div>
 
       <Table
@@ -247,67 +168,21 @@ export default function DevicePage() {
       />
 
       <Modal
-        title={t('create.modalTitle')}
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
+        title={t('renameButton')}
+        open={renameTarget !== null}
+        onCancel={() => setRenameTarget(null)}
         footer={null}
         destroyOnClose
       >
-        {createdSecret ? (
-          <div>
-            <Typography.Paragraph>{t('create.createdNotice')}</Typography.Paragraph>
-            <Typography.Text code copyable style={{ fontSize: 14 }}>
-              {createdSecret}
-            </Typography.Text>
-            <div style={{ marginTop: 16, textAlign: 'right' }}>
-              <Button type="primary" onClick={() => setCreateOpen(false)}>
-                {t('create.gotIt')}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Form form={form} layout="vertical" onFinish={onCreate}>
-            <Form.Item name="pid" label={t('create.pidLabel')} rules={[{ required: true }]}>
-              <Input placeholder={t('create.pidPlaceholder')} />
-            </Form.Item>
-            <Form.Item name="sn" label={t('create.snLabel')} rules={[{ required: true }]}>
-              <Input placeholder={t('create.snPlaceholder')} />
-            </Form.Item>
-            <Form.Item name="name" label={t('create.nameLabel')}>
-              <Input placeholder={t('create.namePlaceholder')} />
-            </Form.Item>
-            <Form.Item name="secret" label={t('create.secretLabel')} extra={t('create.secretExtra')}>
-              <Input placeholder={t('create.secretPlaceholder')} />
-            </Form.Item>
-            <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-              <Space>
-                <Button onClick={() => setCreateOpen(false)}>{t('common:cancel')}</Button>
-                <Button type="primary" htmlType="submit" loading={creating}>
-                  {t('create.submit')}
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        )}
-      </Modal>
-
-      <Modal
-        title={t('setSecretButton')}
-        open={secretModalId !== null}
-        onCancel={() => setSecretModalId(null)}
-        footer={null}
-        destroyOnClose
-      >
-        <Typography.Paragraph>{t('setSecretNotice')}</Typography.Paragraph>
-        <Form form={secretForm} layout="vertical" onFinish={onSetSecret}>
-          <Form.Item name="secret" label={t('setSecretLabel')} rules={[{ required: true }]}>
-            <Input placeholder={t('setSecretPlaceholder')} />
+        <Form form={renameForm} layout="vertical" onFinish={onRename}>
+          <Form.Item name="name" label={t('columns.name')} rules={[{ required: true }]}>
+            <Input placeholder={renameTarget?.sn} />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setSecretModalId(null)}>{t('common:cancel')}</Button>
-              <Button type="primary" htmlType="submit" loading={settingSecret}>
-                {t('setSecretSubmit')}
+              <Button onClick={() => setRenameTarget(null)}>{t('common:cancel')}</Button>
+              <Button type="primary" htmlType="submit" loading={renaming}>
+                {t('common:save')}
               </Button>
             </Space>
           </Form.Item>

@@ -113,22 +113,22 @@ func compare(op string, value, threshold float64) bool {
 	}
 }
 
-// evaluateThresholdRules checks the latest value of each field touched by
-// this report's records against the device's enabled AlertRules, opening
-// a new AlertEvent the first time a rule starts violating and
-// auto-resolving it the first time a later reading stops violating —
-// callers don't need to do anything themselves to "clear" an alert.
-func (s *Store) evaluateThresholdRules(deviceID uint, recs []protocol.Record) error {
-	if len(recs) == 0 {
+// evaluateThresholdRules checks the latest value of each field1..field20
+// key touched by this report's payloads against the device's enabled
+// AlertRules, opening a new AlertEvent the first time a rule starts
+// violating and auto-resolving it the first time a later reading stops
+// violating — callers don't need to do anything themselves to "clear" an
+// alert. AlertRule.Field is free text, so it works unchanged whether it
+// names "field1" or any other key present in Feed.
+func (s *Store) evaluateThresholdRules(deviceID uint, payloads []protocol.Payload) error {
+	if len(payloads) == 0 {
 		return nil
 	}
 
 	latest := make(map[string]float64)
-	for _, r := range recs {
-		for field, v := range r.D {
-			if f, ok := toFloat(v); ok {
-				latest[field] = f
-			}
+	for _, p := range payloads {
+		for field, v := range p.Feed {
+			latest[field] = v
 		}
 	}
 	if len(latest) == 0 {
@@ -195,30 +195,19 @@ func (s *Store) notifyAlertOpened(deviceID uint, message string) {
 	_ = s.CreateNotification(model.NotificationTypeAlert, model.NotificationLevelWarning, "新告警", name+"："+message)
 }
 
-func toFloat(v any) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case int:
-		return float64(n), true
-	default:
-		return 0, false
-	}
-}
-
 // OfflineSweep is run periodically (see cmd/server main.go) rather than
 // on report — offline is the absence of a report, so nothing about
 // receiving one can detect it. Uses the same IsDeviceOnline rule the
 // admin device list/detail view displays, so the alert center and the UI
 // never disagree about which devices are offline.
 //
-// Only devices that have activated at least once are considered — a
-// freshly provisioned device that has never come online yet isn't
-// "offline" in any meaningful sense, so it shouldn't raise an alert the
-// moment it's created (see model.Device.Activated).
+// Every device row is created at the moment of its first successful
+// report (see store.GetOrCreateDeviceBySN), with LastSeenAt set in the
+// same request — so unlike the old provisioning model, there's no
+// "exists but has never reported" state left to exclude here.
 func (s *Store) OfflineSweep(now time.Time) error {
 	var devices []model.Device
-	if err := s.db.Where("status = ? AND activated = ?", model.DeviceStatusEnabled, true).Find(&devices).Error; err != nil {
+	if err := s.db.Where("status = ?", model.DeviceStatusEnabled).Find(&devices).Error; err != nil {
 		return err
 	}
 

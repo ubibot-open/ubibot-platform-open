@@ -5,10 +5,7 @@
   "dataWarehouseGroup": "データウェアハウス",
   "myData": "マイデータ",
   "monitor": "データモニタ",
-  "command": "コマンド送信",
   "alert": "アラートセンター",
-  "schedule": "定期タスク",
-  "firmware": "ファームウェア管理",
   "system": {
     "root": "システム管理",
     "admin": "管理者",

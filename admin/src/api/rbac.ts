@@ -9,8 +9,7 @@ export interface Role {
 
 export const PermissionCodes = [
   { value: 'device:read', label: '设备查看' },
-  { value: 'device:write', label: '设备管理（含探头配置）' },
-  { value: 'command:write', label: '指令下发' },
+  { value: 'device:write', label: '设备管理' },
   { value: 'alert:manage', label: '告警管理' },
   { value: 'system:manage', label: '系统管理（角色/管理员/日志）' },
   { value: '*', label: '全部权限' },

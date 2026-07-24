@@ -23,8 +23,7 @@
   },
   "permissionLabels": {
     "deviceRead": "设备查看",
-    "deviceWrite": "设备管理（含探头配置）",
-    "commandWrite": "指令下发",
+    "deviceWrite": "设备管理",
     "alertManage": "告警管理",
     "systemManage": "系统管理（角色/管理员/日志）",
     "all": "全部权限"

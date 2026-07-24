@@ -276,22 +276,12 @@ export default function DataWarehouseDeviceDetailPage() {
               <Tag>{t('common:disabled')}</Tag>
             )}
           </Descriptions.Item>
-          <Descriptions.Item label={t('info.activated')}>
-            {device?.activated ? (
-              <Tag color="blue">{t('dataWarehouse:activated.yes')}</Tag>
-            ) : (
-              <Tag color="default">{t('dataWarehouse:activated.no')}</Tag>
-            )}
-          </Descriptions.Item>
           <Descriptions.Item label={t('info.online')}>
             {device?.online ? (
               <Tag color="green">{t('dataWarehouse:online.yes')}</Tag>
             ) : (
               <Tag color="default">{t('dataWarehouse:online.no')}</Tag>
             )}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('info.interval')}>
-            {device?.ci} / {device?.ui} {t('info.seconds')}
           </Descriptions.Item>
           <Descriptions.Item label={t('info.createdAt')}>
             {device ? new Date(device.created_at * 1000).toLocaleString() : '-'}

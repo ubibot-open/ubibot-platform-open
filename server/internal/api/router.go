@@ -47,66 +47,40 @@ func spaHandler(ui fs.FS) http.Handler {
 	})
 }
 
-// NewRouter wires the device-facing endpoints (protocol §4/§5/§7.1) and
-// the admin API (login + device/command management) onto a stdlib
-// ServeMux, using Go 1.22's method+pattern routing ("POST /path") and
-// {name} path parameters instead of a web framework. ui is the embedded
-// admin frontend build (see internal/webui) — pass a nil ui / uiBuilt=false
-// to run API-only (e.g. in tests, or before the frontend has ever been
-// built), in which case nothing is mounted at "/".
+// NewRouter wires the device-facing endpoints (protocol §3/§4) and the
+// admin API (login + device management) onto a stdlib ServeMux, using Go
+// 1.22's method+pattern routing ("POST /path") and {name} path parameters
+// instead of a web framework. ui is the embedded admin frontend build (see
+// internal/webui) — pass a nil ui / uiBuilt=false to run API-only (e.g. in
+// tests, or before the frontend has ever been built), in which case
+// nothing is mounted at "/".
 func NewRouter(s *Server, ui fs.FS, uiBuilt bool) http.Handler {
 	mux := http.NewServeMux()
 
-	// Device-facing endpoints (protocol §4/§5/§7.1) are open to anyone who
-	// can reach the server (auth happens inside via signature/token, not
-	// at the transport layer), so these — and only these — get the IP
-	// rate limiter (protocol §8, code 1900).
+	// Device-facing endpoints (protocol §3/§4) are open to anyone who can
+	// reach the server -- there's no signature/token to check anymore, so
+	// the IP rate limiter (protocol §7, code 1900) is the only thing
+	// standing between this surface and abuse.
 	mux.HandleFunc("POST /api/v1/auth/time", withRateLimit(s.RateLimiter, s.TimeSync))
-	mux.HandleFunc("POST /api/v1/auth/activate", withRateLimit(s.RateLimiter, s.Activate))
 	mux.HandleFunc("POST /api/v1/data/report", withRateLimit(s.RateLimiter, s.Report))
-	mux.HandleFunc("GET /api/v1/device/poll", withRateLimit(s.RateLimiter, s.Poll))
-	mux.HandleFunc("GET /api/v1/ota/firmware", withRateLimit(s.RateLimiter, s.OtaFirmwareDownload))
-	// Self-registration key binding (docs §4.1) — called by a provisioning
-	// tool/app, not the device itself, but still unauthenticated device-
-	// facing surface, so it gets the same IP rate limiter.
-	mux.HandleFunc("GET /api/v1/auth/public-key", withRateLimit(s.RateLimiter, s.PublicKey))
-	mux.HandleFunc("POST /api/v1/auth/bind-key", withRateLimit(s.RateLimiter, s.BindDeviceKey))
 
 	mux.HandleFunc("POST /api/admin/login", s.AdminLogin)
 	mux.HandleFunc("GET /api/admin/me", s.RequireAdmin(s.AdminMe))
 
-	// Device read/write.
+	// Device read/write. There is no create endpoint -- a device appears
+	// the moment it successfully reports (docs §4/§6); rename/enable-
+	// disable/delete are the only admin-side mutations left.
 	mux.HandleFunc("GET /api/admin/devices", s.RequirePermission(model.PermDeviceRead, s.ListDevices))
 	// "数据仓库" (data warehouse): activated devices only, each with its
 	// latest telemetry record inlined -- registered before the {id} routes
 	// below purely for readability, Go 1.22's mux dispatches by exact
 	// literal-vs-wildcard segment so "data-warehouse" never matches {id}.
 	mux.HandleFunc("GET /api/admin/devices/data-warehouse", s.RequirePermission(model.PermDeviceRead, s.ListDataWarehouse))
-	mux.HandleFunc("POST /api/admin/devices", s.RequirePermission(model.PermDeviceWrite, s.CreateDevice))
 	mux.HandleFunc("GET /api/admin/devices/{id}", s.RequirePermission(model.PermDeviceRead, s.GetDevice))
 	mux.HandleFunc("GET /api/admin/devices/{id}/records", s.RequirePermission(model.PermDeviceRead, s.GetDeviceRecords))
-	mux.HandleFunc("PATCH /api/admin/devices/{id}/config", s.RequirePermission(model.PermDeviceWrite, s.UpdateDeviceConfig))
+	mux.HandleFunc("PATCH /api/admin/devices/{id}", s.RequirePermission(model.PermDeviceWrite, s.RenameDevice))
 	mux.HandleFunc("POST /api/admin/devices/{id}/status", s.RequirePermission(model.PermDeviceWrite, s.SetDeviceStatus))
-	// Admin-facing "设置密钥" for a self-registered device (docs §4.1) —
-	// the manual alternative to the encrypted POST /api/v1/auth/bind-key
-	// flow; setting a secret on a still-Pending device also completes its
-	// activation (see store.SetDeviceSecret). Rejecting a pending device,
-	// and disabling/re-enabling an already-approved one, both reuse the
-	// status route above (POST .../status with DeviceStatusDisabled/
-	// Enabled) rather than needing dedicated endpoints of their own.
-	mux.HandleFunc("POST /api/admin/devices/{id}/secret", s.RequirePermission(model.PermDeviceWrite, s.SetDeviceSecret))
 	mux.HandleFunc("DELETE /api/admin/devices/{id}", s.RequirePermission(model.PermDeviceWrite, s.DeleteDevice))
-
-	// Probe configuration (protocol §7.2 set_probe) rides on device:write —
-	// it's a device configuration change, same as UpdateDeviceConfig.
-	mux.HandleFunc("GET /api/admin/devices/{id}/probes", s.RequirePermission(model.PermDeviceRead, s.ListProbes))
-	mux.HandleFunc("POST /api/admin/devices/{id}/probes", s.RequirePermission(model.PermDeviceWrite, s.UpsertProbe))
-	mux.HandleFunc("DELETE /api/admin/devices/{id}/probes/{pid}", s.RequirePermission(model.PermDeviceWrite, s.RemoveProbe))
-
-	// Command dispatch/history.
-	mux.HandleFunc("POST /api/admin/devices/{id}/commands", s.RequirePermission(model.PermCommandWrite, s.DispatchCommand))
-	mux.HandleFunc("GET /api/admin/devices/{id}/commands", s.RequirePermission(model.PermDeviceRead, s.ListCommands))
-	mux.HandleFunc("GET /api/admin/commands", s.RequirePermission(model.PermDeviceRead, s.ListAllCommands))
 
 	// Alerting.
 	mux.HandleFunc("GET /api/admin/devices/{id}/alert-rules", s.RequirePermission(model.PermDeviceRead, s.ListAlertRules))
@@ -126,27 +100,10 @@ func NewRouter(s *Server, ui fs.FS, uiBuilt bool) http.Handler {
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteAdminUser))
 	mux.HandleFunc("GET /api/admin/audit-logs", s.RequirePermission(model.PermSystemManage, s.ListAuditLogs))
 
-	// OTA (protocol §7.3): firmware asset management rides on system:manage
-	// (a shared asset, not scoped to one device); per-device dispatch/
-	// cancel/status ride on the same permissions as command dispatch and
-	// device read.
-	mux.HandleFunc("GET /api/admin/firmware", s.RequirePermission(model.PermSystemManage, s.ListFirmware))
-	mux.HandleFunc("POST /api/admin/firmware", s.RequirePermission(model.PermSystemManage, s.UploadFirmware))
-	mux.HandleFunc("DELETE /api/admin/firmware/{id}", s.RequirePermission(model.PermSystemManage, s.DeleteFirmware))
-	mux.HandleFunc("GET /api/admin/devices/{id}/ota", s.RequirePermission(model.PermDeviceRead, s.GetDeviceOTA))
-	mux.HandleFunc("POST /api/admin/devices/{id}/ota", s.RequirePermission(model.PermCommandWrite, s.DispatchDeviceOTA))
-	mux.HandleFunc("POST /api/admin/devices/{id}/ota/cancel", s.RequirePermission(model.PermCommandWrite, s.CancelDeviceOTA))
-
 	// 消息中心.
 	mux.HandleFunc("GET /api/admin/notifications", s.RequireAdmin(s.ListNotifications))
 	mux.HandleFunc("POST /api/admin/notifications/{id}/read", s.RequireAdmin(s.MarkNotificationRead))
 	mux.HandleFunc("POST /api/admin/notifications/read-all", s.RequireAdmin(s.MarkAllNotificationsRead))
-
-	// 定时任务.
-	mux.HandleFunc("GET /api/admin/scheduled-tasks", s.RequirePermission(model.PermCommandWrite, s.ListScheduledTasks))
-	mux.HandleFunc("POST /api/admin/scheduled-tasks", s.RequirePermission(model.PermCommandWrite, s.CreateScheduledTask))
-	mux.HandleFunc("PATCH /api/admin/scheduled-tasks/{id}", s.RequirePermission(model.PermCommandWrite, s.UpdateScheduledTask))
-	mux.HandleFunc("DELETE /api/admin/scheduled-tasks/{id}", s.RequirePermission(model.PermCommandWrite, s.DeleteScheduledTask))
 
 	// 开放API管理 + 只读对外接口.
 	mux.HandleFunc("GET /api/admin/api-keys", s.RequirePermission(model.PermSystemManage, s.ListApiKeys))

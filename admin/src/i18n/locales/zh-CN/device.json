@@ -9,39 +9,17 @@
     "sn": "SN",
     "pid": "PID",
     "status": "状态",
-    "activated": "激活状态",
     "online": "在线",
-    "interval": "采集/上报间隔(s)",
     "lastSeen": "最近上报",
     "actions": "操作"
-  },
-  "activated": {
-    "yes": "已激活",
-    "no": "未激活"
   },
   "online": {
     "yes": "在线",
     "no": "离线"
   },
-  "status": {
-    "pending": "已激活，待确认"
-  },
-  "source": {
-    "title": "来源",
-    "manual": "手动添加",
-    "selfRegistered": "自主激活"
-  },
-  "setSecretButton": "设置密钥",
-  "setSecretNotice": "自主激活的设备没有预置密钥，请通过专用工具/App从设备读取真实密钥后填入。若该设备当前处于待确认状态，设置密钥后将自动完成激活。",
-  "setSecretLabel": "设备密钥",
-  "setSecretPlaceholder": "请输入从设备读取到的真实密钥",
-  "setSecretSubmit": "保存",
-  "setSecretSuccess": "密钥设置成功",
-  "setSecretFailed": "密钥设置失败",
-  "rejectButton": "禁止",
-  "rejectConfirmTitle": "确认禁止该设备激活？禁止后将不再处理该设备的任何数据。",
-  "rejectSuccess": "已禁止",
-  "rejectFailed": "操作失败",
+  "renameButton": "重命名",
+  "renameSuccess": "重命名成功",
+  "renameFailed": "重命名失败",
   "disableButton": "禁用",
   "disableConfirmTitle": "确认禁用该设备？禁用后将不再处理该设备的任何数据。",
   "disableSuccess": "已禁用",
@@ -50,25 +28,7 @@
   "enableSuccess": "已解除禁用",
   "enableFailed": "操作失败",
   "deleteConfirmTitle": "确认删除该设备？",
-  "deleteConfirmContent": "将永久删除该设备及其全部历史数据（上报记录、指令、告警、探头配置等），且不可恢复。",
+  "deleteConfirmContent": "将永久删除该设备及其全部历史数据（上报记录、告警规则等），且不可恢复。",
   "deleteSuccess": "删除成功",
-  "deleteFailed": "删除失败",
-  "create": {
-    "button": "新建设备",
-    "modalTitle": "新建设备",
-    "success": "设备创建成功",
-    "failed": "创建失败",
-    "createdNotice": "设备已创建。设备密钥只会显示这一次，请立即记录并烧录到设备中：",
-    "gotIt": "知道了",
-    "pidLabel": "产品型号 (PID)",
-    "pidPlaceholder": "ubibot_open_dev_v1",
-    "snLabel": "设备序列号 (SN)",
-    "snPlaceholder": "sn_ws1_20002_1",
-    "nameLabel": "设备名称",
-    "namePlaceholder": "选填",
-    "secretLabel": "设备密钥",
-    "secretExtra": "留空则自动生成",
-    "secretPlaceholder": "选填，留空自动生成",
-    "submit": "创建"
-  }
+  "deleteFailed": "删除失败"
 }

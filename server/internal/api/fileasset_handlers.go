@@ -32,8 +32,7 @@ func toFileAssetDTO(f *model.FileAsset) fileAssetDTO {
 }
 
 // UploadFileAsset handles POST /api/admin/files (multipart/form-data:
-// category, file) — a generic file registry (exports, attachments) kept
-// separate from Firmware, which has its own OTA-specific columns.
+// category, file) — a generic file registry (exports, attachments, etc).
 func (s *Server) UploadFileAsset(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileAssetUploadBytes)
 	if err := r.ParseMultipartForm(maxFileAssetUploadBytes); err != nil {

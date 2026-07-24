@@ -7,7 +7,6 @@ export interface SystemMetrics {
   uptime_seconds: number
   db_size_bytes: number
   device_total: number
-  pending_commands: number
   open_alerts: number
   unread_notifications: number
 }

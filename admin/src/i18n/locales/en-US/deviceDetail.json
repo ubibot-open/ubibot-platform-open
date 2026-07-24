@@ -6,85 +6,18 @@
     "snLabel": "SN",
     "pidLabel": "PID",
     "statusLabel": "Status",
-    "activatedLabel": "Activation",
     "onlineLabel": "Connectivity",
-    "ciLabel": "Collect Interval",
-    "uiLabel": "Upload Interval",
     "lastSeenLabel": "Last Seen",
-    "seconds": "s",
-    "activated": { "yes": "Activated", "no": "Not Activated" },
-    "online": { "yes": "Online", "no": "Offline" }
+    "online": { "yes": "Online", "no": "Offline" },
+    "renameButton": "Rename",
+    "renameSuccess": "Renamed successfully",
+    "renameFailed": "Failed to rename"
   },
   "records": {
     "title": "Recent Data",
     "columns": {
       "time": "Time",
       "data": "Data"
-    }
-  },
-  "command": {
-    "dispatchTitle": "Send Command",
-    "historyTitle": "Command History",
-    "form": {
-      "typeLabel": "Command Type",
-      "typeRequired": "Please select a command type",
-      "typePlaceholder": "Select or enter a command type",
-      "typeOptions": {
-        "reboot": "reboot (Restart)",
-        "calibrate": "calibrate (Calibration)",
-        "setCfg": "set_cfg (Update Config)"
-      },
-      "argsLabel": "Arguments (JSON, optional)",
-      "argsPlaceholder": "e.g. {\"ui\": 300}",
-      "submit": "Send Command"
-    },
-    "argsInvalidJson": "Command arguments must be valid JSON",
-    "dispatchSuccess": "Command sent, waiting for the device to confirm on its next report",
-    "dispatchFailed": "Failed to send",
-    "columns": {
-      "id": "Command ID",
-      "type": "Type",
-      "args": "Arguments",
-      "status": "Status",
-      "createdAt": "Sent At"
-    },
-    "status": {
-      "pending": "Pending",
-      "acked": "Acknowledged",
-      "nacked": "Failed"
-    }
-  },
-  "probe": {
-    "title": "Custom Probe Data Reading",
-    "loadFailed": "Failed to load probe configuration",
-    "paramsInvalidJson": "Probe parameters must be valid JSON",
-    "upsertSuccess": "Probe configuration sent, waiting for device confirmation",
-    "upsertFailed": "Failed to configure probe",
-    "removeSuccess": "Probe removal requested, waiting for device confirmation",
-    "removeFailed": "Failed to remove probe",
-    "deleteConfirm": "Remove this probe?",
-    "form": {
-      "pidRequired": "Probe ID",
-      "pidPlaceholder": "Probe ID (pid)",
-      "keyPlaceholder": "Field name (key)",
-      "ifaceRequired": "Interface",
-      "ifacePlaceholder": "Interface",
-      "protoRequired": "Protocol",
-      "protoPlaceholder": "Protocol",
-      "paramsPlaceholder": "Other parameters as JSON, e.g. {\"addr\":1,\"fc\":3,\"reg\":0}",
-      "submit": "Send Configuration"
-    },
-    "columns": {
-      "ifaceProto": "Interface/Protocol",
-      "params": "Parameters",
-      "status": "Status",
-      "actions": "Actions"
-    },
-    "status": {
-      "pending": "Pending",
-      "applied": "Applied",
-      "failed": "Failed",
-      "removing": "Removing"
     }
   },
   "alert": {
@@ -95,7 +28,7 @@
     "deleteConfirm": "Delete this rule?",
     "form": {
       "fieldRequired": "Field name",
-      "fieldPlaceholder": "Field name, e.g. temperature",
+      "fieldPlaceholder": "e.g. field1, or a custom field name",
       "opRequired": "Operator",
       "thresholdRequired": "Threshold",
       "thresholdPlaceholder": "Threshold"
@@ -104,30 +37,6 @@
       "field": "Field",
       "condition": "Condition",
       "actions": "Actions"
-    }
-  },
-  "ota": {
-    "title": "Firmware Upgrade (OTA)",
-    "loadFailed": "Failed to load OTA status",
-    "selectPlaceholder": "Select firmware version",
-    "dispatchButton": "Push Upgrade",
-    "cancelButton": "Cancel Upgrade",
-    "selectFirmwareRequired": "Please select a firmware",
-    "dispatchSuccess": "Upgrade command sent",
-    "dispatchFailed": "Failed to send",
-    "cancelSuccess": "Upgrade cancellation requested",
-    "cancelFailed": "Failed to cancel",
-    "targetVersionLabel": "Target version {{version}}",
-    "noTask": "No upgrade task for this device",
-    "state": {
-      "pending": "Pending",
-      "downloading": "Downloading",
-      "verifying": "Verifying",
-      "flashing": "Flashing",
-      "rebooting": "Rebooting",
-      "success": "Upgrade Succeeded",
-      "failed": "Upgrade Failed",
-      "rolled_back": "Rolled Back"
     }
   }
 }

@@ -1,149 +1,61 @@
 // Package protocol defines the wire format shared by the device-facing
-// HTTP endpoints, mirroring docs/UbiBot开放平台硬件通信协议.md.
+// HTTP endpoints, mirroring docs/UbiBot开放平台硬件通信协议.md — deliberately
+// tiny: no signing, no session tokens, no command channel. A device only
+// ever needs pid+sn to identify itself.
 package protocol
 
 // Business status codes (the "c" field). Zero means success; non-zero
-// codes map to the HTTP status shown in the doc's error table (§8).
+// codes map to the HTTP status shown in the doc's error table (§7).
 const (
-	CodeOK             = 0
-	CodeSignMismatch   = 1002 // bad signature, invalid/used nonce, or timestamp out of window / not advancing
-	CodeMalformedBody  = 1003
-	CodeKeyBindFailed  = 1104 // bind-key: sn not found/not eligible, or ciphertext didn't decrypt (docs §4.1)
-	CodeTokenInvalid   = 1101
-	CodeTokenExpired   = 1102
-	CodeDeviceNotFound = 1103
-	CodeRateLimited    = 1900
-	CodeServerError    = 5000
+	CodeOK                   = 0
+	CodeTimestampOutOfWindow = 1002 // ts outside the ±5 minute window
+	CodeMalformedBody        = 1003
+	CodeDeviceDisabled       = 1103 // device exists but was disabled by an operator
+	CodeRateLimited          = 1900
+	CodeServerError          = 5000
 )
 
-// TimeSyncRequest is POST /api/v1/auth/time. It carries no timestamp: the
-// endpoint validates device identity only, so devices with no local clock
-// reference yet (first boot, RTC lost) can still call it.
+// TimeSyncRequest is POST /api/v1/auth/time (docs §3) — no signature, no
+// timestamp: a device with no clock reference yet can call this purely to
+// learn the current time.
 type TimeSyncRequest struct {
-	PID  string `json:"pid" binding:"required"`
-	SN   string `json:"sn" binding:"required"`
-	Sign string `json:"sign" binding:"required"`
+	PID string `json:"pid" binding:"required"`
+	SN  string `json:"sn" binding:"required"`
 }
 
-// TimeSyncResponse returns the server's current time plus a single-use
-// nonce for the following activation request.
+// TimeSyncResponse returns the server's current time.
 type TimeSyncResponse struct {
-	C int    `json:"c"`
-	T int64  `json:"t"`
-	N string `json:"n"`
+	C int   `json:"c"`
+	T int64 `json:"t"`
 }
 
-// ActivateRequest is POST /api/v1/auth/activate. N is optional: present
-// when the device just called the time-sync endpoint (nonce-bound,
-// replay-proof even without a trustworthy timestamp); absent when the
-// device already has a synced clock, in which case Ts is checked against
-// a time window plus a per-device monotonic floor instead (see
-// store.CheckAndAdvanceActivateTS).
-type ActivateRequest struct {
-	PID  string `json:"pid" binding:"required"`
-	SN   string `json:"sn" binding:"required"`
-	Ts   int64  `json:"ts" binding:"required"`
-	N    string `json:"n"`
-	Sign string `json:"sign" binding:"required"`
+// Payload is one sampled time point (docs §4); Feed maps field1..field20
+// to numeric values. There's no fixed sensor vocabulary — the platform
+// just stores whatever keys arrive (see docs §5 for the field1/2/3
+// default-meaning convention, which is a display-only convention, not
+// something this layer enforces).
+type Payload struct {
+	Ts   int64              `json:"ts" binding:"required"`
+	Feed map[string]float64 `json:"feed" binding:"required"`
 }
 
-// ActivateResponse carries the session token on success.
-type ActivateResponse struct {
-	C     int    `json:"c"`
-	Token string `json:"token"`
-	Exp   int64  `json:"exp"`
-}
-
-// Record is one sampled time point; D maps sensor name to value (scalar
-// or, for compound sensors such as NPK, a nested object).
-type Record struct {
-	Ts int64                  `json:"ts" binding:"required"`
-	D  map[string]interface{} `json:"d" binding:"required"`
-}
-
-// Nak reports a previously-delivered command that the device received but
-// failed to execute (docs §7.2) — e.g. an invalid set_probe register.
-type Nak struct {
-	ID string `json:"id"`
-	C  int    `json:"c"`
-	M  string `json:"m"`
-}
-
-// OtaStatus is the device's self-reported OTA progress (protocol §7.3),
-// piggybacked on a regular data report while an upgrade is in flight.
-type OtaStatus struct {
-	ID       string `json:"id"`
-	Version  string `json:"version"`
-	State    string `json:"state"`
-	Progress int    `json:"progress,omitempty"`
-}
-
-// ReportRequest is POST /api/v1/data/report. Recs supports batching
-// multiple time points (e.g. buffered offline data) in a single upload.
-// Ack/Nak confirm commands the device has already tried to execute (see
-// CmdItem) — a given command id appears in at most one of the two.
+// ReportRequest is POST /api/v1/data/report (docs §4) — the device's only
+// other endpoint besides time-sync. Identity is just PID+SN, in the body,
+// unauthenticated; Ts is the request's own timestamp (checked against a
+// ±5 minute window), separate from each Payload's own Ts (which may be
+// older, for batched offline-buffered samples).
 type ReportRequest struct {
-	DID  string     `json:"did" binding:"required"`
-	Recs []Record   `json:"recs" binding:"required"`
-	Ack  []string   `json:"ack"`
-	Nak  []Nak      `json:"nak"`
-	Ota  *OtaStatus `json:"ota"`
+	PID      string    `json:"pid" binding:"required"`
+	SN       string    `json:"sn" binding:"required"`
+	Ts       int64     `json:"ts" binding:"required"`
+	Payloads []Payload `json:"payloads" binding:"required"`
 }
 
-// Config is the device's sampling/upload configuration.
-type Config struct {
-	CI int      `json:"ci"`
-	UI int      `json:"ui"`
-	FE []string `json:"fe,omitempty"`
-}
-
-// CmdItem is one queued control instruction delivered piggybacked on a
-// report (or poll) response. The device echoes Id back via ack or nak
-// once it has tried to execute it.
-type CmdItem struct {
-	ID string                 `json:"id"`
-	Tp string                 `json:"tp"`
-	A  map[string]interface{} `json:"a,omitempty"`
-}
-
-// ReportResponse is the reply to a data upload (and to the config-poll
-// endpoint). Cfg is only populated when the device's configuration
-// changed since it was last delivered; Cmd is only populated when
-// commands are queued — both omitted otherwise to keep the body small.
+// ReportResponse is the reply to a data upload — deliberately minimal,
+// just an ack and the server's clock for reference.
 type ReportResponse struct {
-	C   int       `json:"c"`
-	T   int64     `json:"t"`
-	Cfg *Config   `json:"cfg,omitempty"`
-	Cmd []CmdItem `json:"cmd,omitempty"`
-}
-
-// PublicKeyResponse is GET /api/v1/auth/public-key's reply (docs §4.1) —
-// the provisioning-tool-facing half of self-registration key binding.
-// PublicKeyPEM is this platform instance's RSA-2048 public key, PKCS#1
-// PEM-encoded; a provisioning tool fetches it once and encrypts a
-// self-registered device's real secret against it before submitting that
-// secret via BindKeyRequest.
-type PublicKeyResponse struct {
-	C            int    `json:"c"`
-	PublicKeyPEM string `json:"public_key_pem"`
-}
-
-// BindKeyRequest is POST /api/v1/auth/bind-key (docs §4.1): a provisioning
-// tool submits a self-registered device's real secret — read directly off
-// the hardware over serial or Bluetooth, since a pre-manufactured device
-// can never be told a secret the platform generated after the fact — so
-// the platform can finally record it and complete that device's
-// activation. Secret is base64(RSA-OAEP-SHA256(PublicKeyPEM, rawSecret)),
-// never the raw secret itself.
-type BindKeyRequest struct {
-	SN     string `json:"sn" binding:"required"`
-	Secret string `json:"secret" binding:"required"`
-}
-
-// BindKeyResponse acknowledges a successful key bind.
-type BindKeyResponse struct {
-	C int    `json:"c"`
-	M string `json:"m"`
+	C int   `json:"c"`
+	T int64 `json:"t"`
 }
 
 // ErrorResponse is the generic error envelope for every endpoint.
@@ -158,9 +70,9 @@ func HTTPStatusFor(code int) int {
 	switch code {
 	case CodeOK:
 		return 200
-	case CodeSignMismatch, CodeMalformedBody, CodeKeyBindFailed:
+	case CodeTimestampOutOfWindow, CodeMalformedBody:
 		return 400
-	case CodeTokenInvalid, CodeTokenExpired, CodeDeviceNotFound:
+	case CodeDeviceDisabled:
 		return 401
 	case CodeRateLimited:
 		return 429

@@ -21,7 +21,6 @@
 
 #define UB_LWIP_HDR_BUF 512
 #define UB_LWIP_RESP_BUF 2048 /* smaller than the host's 8KB: tune to your RAM budget */
-#define UB_LWIP_CHUNK_BUF 1024
 
 static int connect_to(const char *host, int port) {
     struct sockaddr_in addr;
@@ -52,51 +51,26 @@ static int send_all(int fd, const char *data, size_t len) {
     return 0;
 }
 
-/* post/get/download below follow exactly the same shape as
- * ub_transport_sockets.c's ub_sock_post/ub_sock_get/ub_sock_download --
- * only the socket calls change (lwip_* instead of the bare libc names,
- * which on lwIP's socket API are the same functions under a prefix). Refer
- * to that file for the full header-building and response-parsing logic;
- * it's omitted here to avoid duplicating ~150 lines that don't change. */
-
+/* Follows exactly the same shape as ub_transport_sockets.c's
+ * ub_sock_post -- only the socket calls change (lwip_* instead of the bare
+ * libc names, which on lwIP's socket API are the same functions under a
+ * prefix). Refer to that file for the full header-building and
+ * response-parsing logic; it's omitted here to avoid duplicating ~80 lines
+ * that don't change. There is no token/auth header to send -- the protocol
+ * has no session token, just the plaintext pid+sn already in the JSON
+ * body. */
 static int ub_lwip_post(void *user_ctx, const char *host, int port, const char *path,
-                         const char *body, size_t body_len, const char *token_header_value,
-                         int *status, char *resp_buf, size_t resp_cap, size_t *resp_len) {
+                         const char *body, size_t body_len, int *status, char *resp_buf,
+                         size_t resp_cap, size_t *resp_len) {
     (void)user_ctx;
-    (void)host; (void)port; (void)path; (void)body; (void)body_len; (void)token_header_value;
+    (void)host; (void)port; (void)path; (void)body; (void)body_len;
     (void)status; (void)resp_buf; (void)resp_cap; (void)resp_len;
     /* TODO: port the body of ub_sock_post() from ub_transport_sockets.c,
      * using connect_to/send_all above and lwip_recv() in place of recv(). */
     return -1;
 }
 
-static int ub_lwip_get(void *user_ctx, const char *host, int port, const char *path,
-                        const char *token_header_value, int *status, char *resp_buf,
-                        size_t resp_cap, size_t *resp_len) {
-    (void)user_ctx;
-    (void)host; (void)port; (void)path; (void)token_header_value;
-    (void)status; (void)resp_buf; (void)resp_cap; (void)resp_len;
-    /* TODO: port ub_sock_get(). */
-    return -1;
-}
-
-static int ub_lwip_download(void *user_ctx, const char *host, int port, const char *path,
-                             const char *token_header_value, long range_start, int *status,
-                             long *content_length, ub_transport_chunk_fn on_chunk,
-                             void *chunk_ctx) {
-    (void)user_ctx;
-    (void)host; (void)port; (void)path; (void)token_header_value; (void)range_start;
-    (void)status; (void)content_length; (void)on_chunk; (void)chunk_ctx;
-    /* TODO: port ub_sock_download(). This is the one worth extra care on a
-     * real target: keep UB_LWIP_CHUNK_BUF small (a firmware image can be
-     * megabytes; ota_on_chunk in ub_device.c already writes each chunk out
-     * to storage immediately and never buffers the whole image). */
-    return -1;
-}
-
 void ub_lwip_transport_init(ub_transport_t *tr) {
     tr->post = ub_lwip_post;
-    tr->get = ub_lwip_get;
-    tr->download = ub_lwip_download;
     tr->user_ctx = NULL;
 }

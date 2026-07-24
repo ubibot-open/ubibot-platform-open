@@ -5,10 +5,7 @@
   "dataWarehouseGroup": "Data Warehouse",
   "myData": "My Data",
   "monitor": "Data Monitor",
-  "command": "Commands",
   "alert": "Alert Center",
-  "schedule": "Scheduled Tasks",
-  "firmware": "Firmware",
   "system": {
     "root": "System",
     "admin": "Admins",

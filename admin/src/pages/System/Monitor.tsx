@@ -69,22 +69,17 @@ export default function SystemMonitorPage() {
         </Col>
       </Row>
       <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={6}>
+        <Col span={8}>
           <Card loading={loading}>
             <Statistic title={t('stats.deviceTotal')} value={metrics?.device_total ?? 0} />
           </Card>
         </Col>
-        <Col span={6}>
-          <Card loading={loading}>
-            <Statistic title={t('stats.pendingCommands')} value={metrics?.pending_commands ?? 0} />
-          </Card>
-        </Col>
-        <Col span={6}>
+        <Col span={8}>
           <Card loading={loading}>
             <Statistic title={t('stats.openAlerts')} value={metrics?.open_alerts ?? 0} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={8}>
           <Card loading={loading}>
             <Statistic title={t('stats.unreadNotifications')} value={metrics?.unread_notifications ?? 0} />
           </Card>

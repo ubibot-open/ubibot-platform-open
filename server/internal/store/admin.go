@@ -91,8 +91,8 @@ func (s *Store) AdminByUsername(username string) (*model.AdminUser, error) {
 }
 
 // IssueAdminSession creates a new bearer token for adminID, dropping any
-// previously issued sessions for the same account (one live session per
-// admin, same reasoning as IssueDeviceToken).
+// previously issued sessions for the same account — one live session per
+// admin at a time.
 func (s *Store) IssueAdminSession(adminID uint) (token string, exp time.Duration, err error) {
 	tok, err := auth.NewOpaqueToken()
 	if err != nil {

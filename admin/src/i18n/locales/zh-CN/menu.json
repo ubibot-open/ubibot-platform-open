@@ -5,10 +5,7 @@
   "dataWarehouseGroup": "数据仓库",
   "myData": "我的数据",
   "monitor": "数据监控",
-  "command": "指令下发",
   "alert": "告警中心",
-  "schedule": "定时任务",
-  "firmware": "固件管理",
   "system": {
     "root": "系统管理",
     "admin": "管理员",

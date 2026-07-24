@@ -28,45 +28,34 @@ type loginResponse struct {
 	Username  string `json:"username"`
 }
 
+// deviceDTO is deliberately tiny per docs §6: a device only has an
+// identity (pid/sn), a display name, an enable/disable status, and
+// observed state (online/last-seen/created). There's no secret, source,
+// activation flag, or per-device config to show anymore.
 type deviceDTO struct {
-	ID         uint     `json:"id"`
-	PID        string   `json:"pid"`
-	SN         string   `json:"sn"`
-	Name       string   `json:"name"`
-	Status     int      `json:"status"`
-	Source     string   `json:"source"`
-	Activated  bool     `json:"activated"`
-	Online     bool     `json:"online"`
-	CI         int      `json:"ci"`
-	UI         int      `json:"ui"`
-	FE         []string `json:"fe"`
-	LastSeenAt *int64   `json:"last_seen_at"`
-	CreatedAt  int64    `json:"created_at"`
-	Secret     string   `json:"secret,omitempty"` // only populated by CreateDevice
+	ID         uint   `json:"id"`
+	PID        string `json:"pid"`
+	SN         string `json:"sn"`
+	Name       string `json:"name"`
+	Status     int    `json:"status"`
+	Online     bool   `json:"online"`
+	LastSeenAt *int64 `json:"last_seen_at"`
+	CreatedAt  int64  `json:"created_at"`
 }
 
 // toDeviceDTO's Online field uses the same rule (store.IsDeviceOnline) the
 // offline-alert sweep does, so the device list/detail view and the alert
 // center never disagree about which devices are up. now is the caller's
 // s.Now() rather than time.Now() directly so this stays testable against
-// a mocked clock, same as the rest of the device-facing time logic.
+// a mocked clock.
 func toDeviceDTO(d *model.Device, now time.Time) deviceDTO {
-	var fe []string
-	if d.FE != "" {
-		_ = json.Unmarshal([]byte(d.FE), &fe)
-	}
 	dto := deviceDTO{
 		ID:        d.ID,
 		PID:       d.PID,
 		SN:        d.SN,
 		Name:      d.Name,
 		Status:    d.Status,
-		Source:    d.Source,
-		Activated: d.Activated,
 		Online:    store.IsDeviceOnline(d, now),
-		CI:        d.CI,
-		UI:        d.UI,
-		FE:        fe,
 		CreatedAt: d.CreatedAt.Unix(),
 	}
 	if d.LastSeenAt != nil {
@@ -79,32 +68,6 @@ func toDeviceDTO(d *model.Device, now time.Time) deviceDTO {
 type recordDTO struct {
 	Ts int64          `json:"ts"`
 	D  map[string]any `json:"d"`
-}
-
-type commandDTO struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Args       map[string]any `json:"args,omitempty"`
-	Status     string         `json:"status"`
-	NakMessage string         `json:"nak_message,omitempty"`
-	CreatedAt  int64          `json:"created_at"`
-}
-
-func toCommandDTO(cmd *model.DeviceCommand) commandDTO {
-	dto := commandDTO{
-		ID:         cmd.CmdID,
-		Type:       cmd.Type,
-		Status:     cmd.Status,
-		NakMessage: cmd.NakMessage,
-		CreatedAt:  cmd.CreatedAt.Unix(),
-	}
-	if cmd.Args != "" {
-		var a map[string]any
-		if err := json.Unmarshal([]byte(cmd.Args), &a); err == nil {
-			dto.Args = a
-		}
-	}
-	return dto
 }
 
 func paginationParams(r *http.Request) (page, pageSize int) {
@@ -182,13 +145,16 @@ type dataWarehouseItemDTO struct {
 }
 
 // ListDataWarehouse handles GET /api/admin/devices/data-warehouse — like
-// ListDevices, but scoped to activated devices only and annotated with each
-// one's latest report, so the frontend can render a live sensor-data
-// preview per row without an extra request per device.
+// ListDevices, annotated with each device's latest report, so the frontend
+// can render a live sensor-data preview per row without an extra request
+// per device. Every device in the table has reported at least once by
+// construction (see store.GetOrCreateDeviceBySN), so unlike the old
+// "activated devices only" filter, this is now just ListDevices plus the
+// latest-record join.
 func (s *Server) ListDataWarehouse(w http.ResponseWriter, r *http.Request) {
 	page, pageSize := paginationParams(r)
 
-	devices, total, err := s.Store.ListActivatedDevices(page, pageSize)
+	devices, total, err := s.Store.ListDevices(page, pageSize)
 	if err != nil {
 		adminErr(w, 500, "internal error")
 		return
@@ -218,49 +184,9 @@ func (s *Server) ListDataWarehouse(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"list": list, "total": total})
 }
 
-type createDeviceRequest struct {
-	PID    string `json:"pid"`
-	SN     string `json:"sn"`
-	Secret string `json:"secret"`
-	Name   string `json:"name"`
-}
-
-// CreateDevice handles POST /api/admin/devices. This is the only place a
-// device's secret is ever shown back — write it down / flash it now, the
-// API won't return it again.
-func (s *Server) CreateDevice(w http.ResponseWriter, r *http.Request) {
-	var req createDeviceRequest
-	if err := decodeJSON(r, &req); err != nil || req.PID == "" || req.SN == "" {
-		adminErr(w, 400, "pid and sn are required")
-		return
-	}
-
-	secret := req.Secret
-	if secret == "" {
-		var err error
-		secret, err = auth.NewDeviceSecret()
-		if err != nil {
-			adminErr(w, 500, "internal error")
-			return
-		}
-	}
-
-	dev, err := s.Store.CreateDevice(req.PID, req.SN, secret, req.Name)
-	if err != nil {
-		adminErr(w, 400, "device already exists or invalid input")
-		return
-	}
-
-	s.audit(r, "device.create", "device", dev.ID, dev.SN)
-
-	dto := toDeviceDTO(dev, s.Now())
-	dto.Secret = secret
-	writeJSON(w, 200, dto)
-}
-
 // GetDevice handles GET /api/admin/devices/{id} — detail view with recent
-// telemetry and recent command history, enough for "后台能看" without a
-// full historical query UI (that's a later slice).
+// telemetry, enough for "后台能看" without a full historical query UI
+// (that's GetDeviceRecords).
 func (s *Server) GetDevice(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -290,59 +216,54 @@ func (s *Server) GetDevice(w http.ResponseWriter, r *http.Request) {
 		recordDTOs = append(recordDTOs, recordDTO{Ts: rec.Ts, D: d})
 	}
 
-	commands, _, err := s.Store.ListCommands(dev.ID, 1, 20)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
-	commandDTOs := make([]commandDTO, 0, len(commands))
-	for i := range commands {
-		commandDTOs = append(commandDTOs, toCommandDTO(&commands[i]))
-	}
-
 	writeJSON(w, 200, map[string]any{
-		"device":   toDeviceDTO(dev, s.Now()),
-		"records":  recordDTOs,
-		"commands": commandDTOs,
+		"device":  toDeviceDTO(dev, s.Now()),
+		"records": recordDTOs,
 	})
 }
 
-type updateConfigRequest struct {
-	CI int      `json:"ci"`
-	UI int      `json:"ui"`
-	FE []string `json:"fe"`
+type renameDeviceRequest struct {
+	Name string `json:"name"`
 }
 
-// UpdateDeviceConfig handles PATCH /api/admin/devices/{id}/config. The
-// change reaches the device on its next report/poll via the existing
-// cfg-diff push in store.ProcessReport — this endpoint only edits the
-// desired state.
-func (s *Server) UpdateDeviceConfig(w http.ResponseWriter, r *http.Request) {
+// RenameDevice handles PATCH /api/admin/devices/{id} — the only thing
+// about a device an operator can configure after it auto-appears (see
+// docs §6). An empty name is allowed (clears back to showing the SN in
+// the frontend).
+func (s *Server) RenameDevice(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		adminErr(w, 400, "invalid id")
 		return
 	}
 
-	var req updateConfigRequest
-	if err := decodeJSON(r, &req); err != nil || req.CI <= 0 || req.UI <= 0 {
-		adminErr(w, 400, "ci and ui are required")
+	var req renameDeviceRequest
+	if err := decodeJSON(r, &req); err != nil {
+		adminErr(w, 400, "malformed request body")
 		return
 	}
 
-	if err := s.Store.SetDeviceConfig(uint(id), req.CI, req.UI, req.FE); err != nil {
+	if err := s.Store.RenameDevice(uint(id), req.Name); err != nil {
 		adminErr(w, 500, "internal error")
 		return
 	}
-	s.audit(r, "device.update_config", "device", uint(id), "")
-	writeJSON(w, 200, map[string]any{"message": "ok"})
+	s.audit(r, "device.rename", "device", uint(id), req.Name)
+
+	dev, err := s.Store.DeviceByID(uint(id))
+	if err != nil {
+		adminErr(w, 500, "internal error")
+		return
+	}
+	writeJSON(w, 200, toDeviceDTO(dev, s.Now()))
 }
 
 type setStatusRequest struct {
 	Status int `json:"status"`
 }
 
-// SetDeviceStatus handles POST /api/admin/devices/{id}/status.
+// SetDeviceStatus handles POST /api/admin/devices/{id}/status — the
+// enable/disable toggle. A disabled device is rejected by every
+// device-facing endpoint (docs §6/§7, code 1103).
 func (s *Server) SetDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -366,50 +287,6 @@ func (s *Server) SetDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "device.set_status", "device", uint(id), strconv.Itoa(req.Status))
 	writeJSON(w, 200, map[string]any{"message": "ok"})
-}
-
-type setDeviceSecretRequest struct {
-	Secret string `json:"secret"`
-}
-
-// SetDeviceSecret handles POST /api/admin/devices/{id}/secret — the
-// admin-facing "设置密钥" action (docs §4.1). A self-registered device (see
-// model.DeviceSourceSelfRegistered) is auto-created with no secret at all,
-// since there is no way to tell a pre-manufactured device a secret the
-// platform picked; an operator who was told (or read off a provisioning
-// tool's screen) that device's real, factory-set secret can type it in
-// here directly instead of going through the encrypted key-binding
-// endpoint (see BindDeviceKey). If the device was still Pending, this also
-// completes its activation (see store.SetDeviceSecret).
-func (s *Server) SetDeviceSecret(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		adminErr(w, 400, "invalid id")
-		return
-	}
-
-	var req setDeviceSecretRequest
-	if err := decodeJSON(r, &req); err != nil || req.Secret == "" {
-		adminErr(w, 400, "secret is required")
-		return
-	}
-
-	if err := s.Store.SetDeviceSecret(uint(id), req.Secret); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			adminErr(w, 404, "device not found")
-		} else {
-			adminErr(w, 500, "internal error")
-		}
-		return
-	}
-	s.audit(r, "device.set_secret", "device", uint(id), "")
-
-	dev, err := s.Store.DeviceByID(uint(id))
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
-	writeJSON(w, 200, toDeviceDTO(dev, s.Now()))
 }
 
 // DeleteDevice handles DELETE /api/admin/devices/{id} — permanently
@@ -441,64 +318,6 @@ func (s *Server) DeleteDevice(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"message": "ok"})
 }
 
-type dispatchCommandRequest struct {
-	Type string         `json:"type"`
-	Args map[string]any `json:"args"`
-}
-
-// DispatchCommand handles POST /api/admin/devices/{id}/commands — this is
-// the "手动下发一条指令" entry point: it queues a row that
-// store.PendingCommands will attach to the device's next report/poll
-// response, and that the admin device-detail view can then watch flip to
-// acked (or nacked) once the device processes it.
-func (s *Server) DispatchCommand(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		adminErr(w, 400, "invalid id")
-		return
-	}
-
-	if _, err := s.Store.DeviceByID(uint(id)); errors.Is(err, store.ErrNotFound) {
-		adminErr(w, 404, "device not found")
-		return
-	}
-
-	var req dispatchCommandRequest
-	if err := decodeJSON(r, &req); err != nil || req.Type == "" {
-		adminErr(w, 400, "type is required")
-		return
-	}
-
-	cmd, err := s.Store.QueueCommand(uint(id), req.Type, req.Args)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
-	s.audit(r, "command.dispatch", "device", uint(id), req.Type)
-	writeJSON(w, 200, toCommandDTO(cmd))
-}
-
-// ListCommands handles GET /api/admin/devices/{id}/commands.
-func (s *Server) ListCommands(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		adminErr(w, 400, "invalid id")
-		return
-	}
-	page, pageSize := paginationParams(r)
-
-	commands, total, err := s.Store.ListCommands(uint(id), page, pageSize)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
-	list := make([]commandDTO, 0, len(commands))
-	for i := range commands {
-		list = append(list, toCommandDTO(&commands[i]))
-	}
-	writeJSON(w, 200, map[string]any{"list": list, "total": total})
-}
-
 // GetDeviceRecords handles GET /api/admin/devices/{id}/records?start=&end=
 // — the "历史数据查询" page's backing endpoint. start/end are Unix
 // seconds; omit either to leave that bound open.
@@ -522,48 +341,6 @@ func (s *Server) GetDeviceRecords(w http.ResponseWriter, r *http.Request) {
 		var d map[string]any
 		_ = json.Unmarshal([]byte(rec.Data), &d)
 		list = append(list, recordDTO{Ts: rec.Ts, D: d})
-	}
-	writeJSON(w, 200, map[string]any{"list": list, "total": total})
-}
-
-// ListAllCommands handles GET /api/admin/commands — cross-device command
-// history for the "指令管理" page, filterable by device_id/status/type.
-// (ListCommands above is the same data scoped to one device's detail
-// view.)
-func (s *Server) ListAllCommands(w http.ResponseWriter, r *http.Request) {
-	page, pageSize := paginationParams(r)
-	deviceID, _ := strconv.Atoi(r.URL.Query().Get("device_id"))
-
-	f := store.CommandFilter{
-		DeviceID: uint(deviceID),
-		Status:   r.URL.Query().Get("status"),
-		Type:     r.URL.Query().Get("type"),
-	}
-	commands, total, err := s.Store.ListAllCommands(f, page, pageSize)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
-
-	deviceNames := make(map[uint]string)
-	list := make([]map[string]any, 0, len(commands))
-	for i := range commands {
-		dto := toCommandDTO(&commands[i])
-		name, ok := deviceNames[commands[i].DeviceID]
-		if !ok {
-			if dev, err := s.Store.DeviceByID(commands[i].DeviceID); err == nil {
-				name = dev.Name
-				if name == "" {
-					name = dev.SN
-				}
-			}
-			deviceNames[commands[i].DeviceID] = name
-		}
-		list = append(list, map[string]any{
-			"id": dto.ID, "type": dto.Type, "args": dto.Args, "status": dto.Status,
-			"nak_message": dto.NakMessage, "created_at": dto.CreatedAt,
-			"device_id": commands[i].DeviceID, "device_name": name,
-		})
 	}
 	writeJSON(w, 200, map[string]any{"list": list, "total": total})
 }

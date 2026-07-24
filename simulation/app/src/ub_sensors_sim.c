@@ -9,6 +9,10 @@
 
 static double g_temperature = 25.0;
 static double g_humidity = 55.0;
+/* Baseline chosen as "bright, overcast daylight" -- a middling value so the
+ * random walk can drift toward either a dim indoor reading or full direct
+ * sunlight without immediately clamping at a bound. */
+static double g_light = 20000.0;
 static int g_seeded = 0;
 
 static double step(double value, double min, double max, double max_delta) {
@@ -38,12 +42,14 @@ double ub_sensor_read_humidity(void) {
     return g_humidity;
 }
 
-double ub_sensor_read_probe(const char *pid, double scale, double offset) {
-    (void)pid;
+double ub_sensor_read_light(void) {
     seed_once();
-    /* A generic drifting raw value, scaled/offset the same way a real
-     * Modbus register read would be after set_probe configures it. */
-    static double raw = 500.0;
-    raw = step(raw, 0.0, 4095.0, 20.0);
-    return raw * scale + offset;
+    /* Illuminance bounds cover the full range a cheap ambient light sensor
+     * would report: near 0 lux at night up to ~100000 lux in direct
+     * sunlight. max_delta is a fixed absolute step (not proportional to the
+     * current value, same as temperature/humidity above) -- large enough
+     * that the walk actually explores the range over a session instead of
+     * crawling. */
+    g_light = step(g_light, 0.0, 100000.0, 800.0);
+    return g_light;
 }

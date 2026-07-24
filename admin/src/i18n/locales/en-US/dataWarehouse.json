@@ -1,6 +1,6 @@
 {
   "title": "Data Warehouse",
-  "subtitle": "{{count}} activated device(s), showing each device's latest reported sensor data",
+  "subtitle": "{{count}} device(s), showing each device's latest reported sensor data",
   "loadFailed": "Failed to load data warehouse",
   "neverReported": "Never reported",
   "noData": "No data",
@@ -20,21 +20,9 @@
     "yes": "Online",
     "no": "Offline"
   },
-  "activated": {
-    "yes": "Activated",
-    "no": "Not Activated"
-  },
   "fields": {
-    "temperature": "Temperature",
-    "humidity": "Humidity",
-    "light": "Light",
-    "battery": "Battery",
-    "voltage": "Voltage",
-    "rssi": "Signal Strength",
-    "signal": "Signal Strength",
-    "wifi": "WiFi",
-    "interface": "Power Source",
-    "co2": "CO₂ Level",
-    "pressure": "Pressure"
+    "field1": "Temperature",
+    "field2": "Humidity",
+    "field3": "Light"
   }
 }

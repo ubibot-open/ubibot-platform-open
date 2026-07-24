@@ -9,39 +9,17 @@
     "sn": "SN",
     "pid": "PID",
     "status": "状態",
-    "activated": "有効化状態",
     "online": "オンライン",
-    "interval": "収集/アップロード間隔(秒)",
     "lastSeen": "最終報告",
     "actions": "操作"
-  },
-  "activated": {
-    "yes": "有効化済み",
-    "no": "未有効化"
   },
   "online": {
     "yes": "オンライン",
     "no": "オフライン"
   },
-  "status": {
-    "pending": "有効化済み・確認待ち"
-  },
-  "source": {
-    "title": "ソース",
-    "manual": "手動追加",
-    "selfRegistered": "自己登録"
-  },
-  "setSecretButton": "鍵を設定",
-  "setSecretNotice": "自己登録デバイスには事前設定された鍵がありません。専用ツール/アプリでデバイスから実際の鍵を読み取り、ここに入力してください。このデバイスが現在「確認待ち」状態の場合、鍵を設定すると自動的に有効化が完了します。",
-  "setSecretLabel": "デバイスシークレット",
-  "setSecretPlaceholder": "デバイスから読み取った実際の鍵を入力",
-  "setSecretSubmit": "保存",
-  "setSecretSuccess": "鍵を設定しました",
-  "setSecretFailed": "鍵の設定に失敗しました",
-  "rejectButton": "拒否",
-  "rejectConfirmTitle": "このデバイスを拒否しますか？拒否するとこのデバイスのデータは一切処理されなくなります。",
-  "rejectSuccess": "拒否しました",
-  "rejectFailed": "操作に失敗しました",
+  "renameButton": "名前を変更",
+  "renameSuccess": "名前を変更しました",
+  "renameFailed": "名前の変更に失敗しました",
   "disableButton": "無効化",
   "disableConfirmTitle": "このデバイスを無効化しますか？無効化するとこのデバイスのデータは一切処理されなくなります。",
   "disableSuccess": "無効化しました",
@@ -50,25 +28,7 @@
   "enableSuccess": "無効化を解除しました",
   "enableFailed": "操作に失敗しました",
   "deleteConfirmTitle": "このデバイスを削除しますか？",
-  "deleteConfirmContent": "このデバイスとその全履歴（テレメトリ、コマンド、アラート、プローブ設定など）を完全に削除します。元に戻せません。",
+  "deleteConfirmContent": "このデバイスとその全履歴（テレメトリ、アラートルールなど）を完全に削除します。元に戻せません。",
   "deleteSuccess": "削除しました",
-  "deleteFailed": "削除に失敗しました",
-  "create": {
-    "button": "デバイスを新規作成",
-    "modalTitle": "デバイスを新規作成",
-    "success": "デバイスを作成しました",
-    "failed": "作成に失敗しました",
-    "createdNotice": "デバイスを作成しました。デバイスシークレットはこの一度だけ表示されます。必ず記録し、デバイスに書き込んでください：",
-    "gotIt": "了解",
-    "pidLabel": "製品型番 (PID)",
-    "pidPlaceholder": "ubibot_open_dev_v1",
-    "snLabel": "デバイスシリアル番号 (SN)",
-    "snPlaceholder": "sn_ws1_20002_1",
-    "nameLabel": "デバイス名",
-    "namePlaceholder": "任意",
-    "secretLabel": "デバイスシークレット",
-    "secretExtra": "空欄の場合は自動生成されます",
-    "secretPlaceholder": "任意、空欄の場合は自動生成",
-    "submit": "作成"
-  }
+  "deleteFailed": "削除に失敗しました"
 }

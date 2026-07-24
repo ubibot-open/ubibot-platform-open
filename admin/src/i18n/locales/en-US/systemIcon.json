@@ -17,7 +17,7 @@
   "modal": {
     "title": "Upload Icon",
     "keyLabel": "Field Key",
-    "keyPlaceholder": "e.g. temperature, co2, or a custom probe field name",
+    "keyPlaceholder": "e.g. field1, field2, or any custom field4-field20",
     "keyExtraLocked": "Locked -- replacing this field's icon",
     "keyExtraHint": "Must match the field key as it appears in reported sensor data",
     "nameLabel": "Name",

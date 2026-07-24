@@ -9,39 +9,17 @@
     "sn": "SN",
     "pid": "PID",
     "status": "Status",
-    "activated": "Activation",
     "online": "Online",
-    "interval": "Collect/Upload Interval (s)",
     "lastSeen": "Last Seen",
     "actions": "Actions"
-  },
-  "activated": {
-    "yes": "Activated",
-    "no": "Not Activated"
   },
   "online": {
     "yes": "Online",
     "no": "Offline"
   },
-  "status": {
-    "pending": "Activated, Pending Confirmation"
-  },
-  "source": {
-    "title": "Source",
-    "manual": "Manually Added",
-    "selfRegistered": "Self-Registered"
-  },
-  "setSecretButton": "Set Secret",
-  "setSecretNotice": "A self-registered device has no pre-set secret. Use a dedicated tool/app to read its real secret off the device, then enter it here. If this device is currently Pending Confirmation, setting its secret also completes its activation.",
-  "setSecretLabel": "Device Secret",
-  "setSecretPlaceholder": "Enter the real secret read from the device",
-  "setSecretSubmit": "Save",
-  "setSecretSuccess": "Secret set successfully",
-  "setSecretFailed": "Failed to set secret",
-  "rejectButton": "Reject",
-  "rejectConfirmTitle": "Reject this device? Once rejected, no data from it will be processed at all.",
-  "rejectSuccess": "Rejected",
-  "rejectFailed": "Action failed",
+  "renameButton": "Rename",
+  "renameSuccess": "Renamed successfully",
+  "renameFailed": "Failed to rename",
   "disableButton": "Disable",
   "disableConfirmTitle": "Disable this device? Once disabled, no data from it will be processed at all.",
   "disableSuccess": "Disabled",
@@ -50,25 +28,7 @@
   "enableSuccess": "Re-enabled",
   "enableFailed": "Action failed",
   "deleteConfirmTitle": "Delete this device?",
-  "deleteConfirmContent": "This permanently deletes the device and all of its history (telemetry, commands, alerts, probe configuration, etc.) — this cannot be undone.",
+  "deleteConfirmContent": "This permanently deletes the device and all of its history (telemetry, alert rules, etc.) — this cannot be undone.",
   "deleteSuccess": "Deleted",
-  "deleteFailed": "Delete failed",
-  "create": {
-    "button": "New Device",
-    "modalTitle": "New Device",
-    "success": "Device created successfully",
-    "failed": "Failed to create device",
-    "createdNotice": "Device created. The device secret is shown only once — record it and flash it to the device immediately:",
-    "gotIt": "Got it",
-    "pidLabel": "Product ID (PID)",
-    "pidPlaceholder": "ubibot_open_dev_v1",
-    "snLabel": "Serial Number (SN)",
-    "snPlaceholder": "sn_ws1_20002_1",
-    "nameLabel": "Device Name",
-    "namePlaceholder": "Optional",
-    "secretLabel": "Device Secret",
-    "secretExtra": "Leave blank to auto-generate",
-    "secretPlaceholder": "Optional, auto-generated if left blank",
-    "submit": "Create"
-  }
+  "deleteFailed": "Delete failed"
 }

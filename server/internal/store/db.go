@@ -1,5 +1,5 @@
-// Package store is the persistence layer: device identity, issued tokens,
-// telemetry history, and the command queue, all backed by SQLite through
+// Package store is the persistence layer: device identity, telemetry
+// history, alerting, and admin/RBAC state, all backed by SQLite through
 // GORM. Everything the device-facing and admin-facing handlers need to
 // read or write goes through the Store methods in this package — handlers
 // never touch *gorm.DB directly.
@@ -7,7 +7,6 @@ package store
 
 import (
 	"fmt"
-	"sync"
 
 	// glebarez/sqlite is a drop-in replacement for gorm.io/driver/sqlite
 	// backed by modernc.org/sqlite -- a pure-Go SQLite implementation, not
@@ -24,13 +23,10 @@ import (
 	"github.com/ubibot/ubibot-platform-open/internal/model"
 )
 
-// Store wraps the database handle. The mutex only guards the in-memory
-// nonce map (see nonce.go in internal/auth, which is intentionally kept
-// separate and non-persistent); everything durable goes through GORM,
-// which handles its own concurrency.
+// Store wraps the database handle. GORM handles its own concurrency, so
+// there's no additional locking needed here.
 type Store struct {
 	db *gorm.DB
-	mu sync.Mutex
 }
 
 // Open opens (creating if needed) the SQLite database at path and runs
@@ -46,20 +42,14 @@ func Open(path string) (*Store, error) {
 
 	if err := db.AutoMigrate(
 		&model.Device{},
-		&model.DeviceToken{},
 		&model.DeviceRecord{},
-		&model.DeviceCommand{},
-		&model.DeviceProbe{},
 		&model.AlertRule{},
 		&model.AlertEvent{},
 		&model.Role{},
 		&model.AdminUser{},
 		&model.AdminSession{},
 		&model.AuditLog{},
-		&model.Firmware{},
-		&model.DeviceOTA{},
 		&model.Notification{},
-		&model.ScheduledTask{},
 		&model.ApiKey{},
 		&model.FileAsset{},
 		&model.DictEntry{},

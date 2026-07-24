@@ -23,8 +23,7 @@
   },
   "permissionLabels": {
     "deviceRead": "デバイス閲覧",
-    "deviceWrite": "デバイス管理（プローブ設定を含む）",
-    "commandWrite": "コマンド送信",
+    "deviceWrite": "デバイス管理",
     "alertManage": "アラート管理",
     "systemManage": "システム管理（ロール／管理者／ログ）",
     "all": "すべての権限"

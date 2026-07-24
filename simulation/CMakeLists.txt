@@ -25,8 +25,6 @@ endif()
 
 # ---- core: protocol codec, zero OS dependencies ---------------------------
 add_library(ubibot_core STATIC
-  core/src/ub_sha256.c
-  core/src/ub_hmac_sha256.c
   core/src/ub_json.c
   core/src/ub_protocol.c
 )
@@ -45,7 +43,6 @@ endif()
 # ---- app: device state machine + host HAL implementations ----------------
 add_library(ubibot_app STATIC
   app/src/ub_platform_host.c
-  app/src/ub_storage_file.c
   app/src/ub_sensors_sim.c
   app/src/ub_device.c
 )
@@ -57,11 +54,6 @@ target_link_libraries(ub_device_sim PRIVATE ubibot_app ubibot_transport ubibot_c
 
 # ---- tests -----------------------------------------------------------------
 enable_testing()
-
-add_executable(test_sha256 test/test_sha256.c)
-target_link_libraries(test_sha256 PRIVATE ubibot_core)
-target_include_directories(test_sha256 PRIVATE test)
-add_test(NAME test_sha256 COMMAND test_sha256)
 
 add_executable(test_protocol test/test_protocol.c)
 target_link_libraries(test_protocol PRIVATE ubibot_core)

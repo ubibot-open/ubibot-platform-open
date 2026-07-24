@@ -30,11 +30,6 @@ func (s *Server) DashboardSummary(w http.ResponseWriter, r *http.Request) {
 		adminErr(w, 500, "internal error")
 		return
 	}
-	_, pendingCmds, err := s.Store.ListAllCommands(store.CommandFilter{Status: model.CommandStatusPending}, 1, 1)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
 	todayRecords, err := s.Store.CountRecordsSince(startOfToday)
 	if err != nil {
@@ -43,11 +38,10 @@ func (s *Server) DashboardSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, 200, map[string]any{
-		"device_total":     deviceTotal,
-		"device_online":    online,
-		"open_alerts":      openAlerts,
-		"pending_commands": pendingCmds,
-		"today_records":    todayRecords,
+		"device_total":  deviceTotal,
+		"device_online": online,
+		"open_alerts":   openAlerts,
+		"today_records": todayRecords,
 	})
 }
 

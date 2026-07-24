@@ -1,88 +1,32 @@
 // Package model holds the GORM row types persisted by the server. This is
-// the durable book of record — device identity, issued tokens, telemetry
-// history, and the command queue all survive a restart because they live
-// here instead of in an in-memory map.
+// the durable book of record — device identity and telemetry history
+// survive a restart because they live here instead of in an in-memory map.
 package model
 
 import "time"
 
-// Device statuses. Disabled behaves like "unknown device" to every
-// device-facing endpoint (see internal/api), so disabling one doesn't leak
-// which serials exist. Pending is the extra state a self-registered device
-// (see DeviceSourceSelfRegistered) starts in: it also fails every
-// device-facing endpoint's Status == Enabled check exactly like Disabled
-// does, so an unconfirmed device can't send or receive any data either —
-// the only difference from Disabled is that it's expected to advance to
-// Enabled on its own once its real secret reaches the platform (docs §4.1
-// key binding, or the admin-facing SetDeviceSecret — see store.SetDeviceSecret),
-// rather than needing an explicit operator decision the way Disabled does.
+// Device statuses. A disabled device is rejected by every device-facing
+// endpoint (see internal/api) — this is the only lever an operator has
+// over an existing device short of deleting it outright.
 const (
 	DeviceStatusEnabled  = 1
 	DeviceStatusDisabled = 2
-	DeviceStatusPending  = 3
 )
 
-// Device source channels: a manually-provisioned device is created ahead
-// of time by an operator via 设备管理 (see api.CreateDevice) for a newly
-// manufactured unit — the platform generates its secret and the operator
-// flashes that exact value into the device before it ever ships, so
-// connecting for the first time activates immediately. A self-registered
-// device instead shows up on its own: its SN wasn't in this platform's
-// database yet when it tried to activate, so the server auto-created a
-// Pending row for it with no secret at all (see api.Activate /
-// store.AutoRegisterDevice) — this covers a pre-manufactured device whose
-// factory-set secret the platform was never told. That secret still has
-// to reach the platform somehow before the device can do anything; see
-// docs §4.1 for the two ways that happens (an encrypted key-binding
-// submission from a provisioning tool, or an operator typing it in
-// directly via SetDeviceSecret).
-const (
-	DeviceSourceManual         = "manual"
-	DeviceSourceSelfRegistered = "self_registered"
-)
-
-// Device is the factory-provisioned identity triple plus the
-// sampling/upload configuration the server pushes down. Did (used in
-// /api/v1/data/report) is the same value as SN — the protocol doc has no
-// separate device-registration step that would mint a distinct id.
+// Device is a device's identity plus the bookkeeping needed to show it in
+// 设备管理 and judge whether it's online. Per docs
+// UbiBot开放平台硬件通信协议.md, there is no provisioning step: a device
+// shows up the moment it successfully calls POST /api/v1/data/report with
+// an SN this platform hasn't seen before (see store.GetOrCreateDeviceBySN)
+// — no secret, no signature, no activation handshake. PID/SN are the
+// entire identity; Name is purely a display label an operator can set
+// after the fact (see api's rename handler).
 type Device struct {
 	ID     uint   `gorm:"primaryKey"`
 	PID    string `gorm:"size:64;not null"`
 	SN     string `gorm:"size:64;not null;uniqueIndex"`
-	Secret string `gorm:"size:128;not null"`
 	Name   string `gorm:"size:128"`
 	Status int    `gorm:"not null;default:1"`
-
-	// Source distinguishes how this row came to exist (DeviceSourceManual /
-	// DeviceSourceSelfRegistered) — see the const block above.
-	Source string `gorm:"size:24;not null;default:manual"`
-
-	// Activated records whether this device has ever completed the
-	// activation handshake (protocol §4) at least once — separate from
-	// Status (enable/disable is an operator decision; Activated is a fact
-	// about the device's own history that, once true, never reverts).
-	// A device that has never activated has never been online, so the
-	// offline-alert sweep (see store.OfflineSweep) skips it rather than
-	// immediately raising an alert for a device that was never up.
-	Activated bool `gorm:"not null;default:false"`
-
-	// Config pushed to the device (protocol §7 cfg block). FE is stored as
-	// a JSON array string; empty means "all sensors enabled".
-	CI int    `gorm:"not null;default:30"`
-	UI int    `gorm:"not null;default:600"`
-	FE string `gorm:"type:text"`
-
-	// CfgVersion bumps on every config change; LastSentCfgVersion is the
-	// version last delivered to the device. The two only match once the
-	// device has picked up the latest config — that's what makes cfg
-	// diff-only (protocol §7: "仅当配置变化时才返回").
-	CfgVersion         int
-	LastSentCfgVersion int
-
-	// LastActivateTS guards the fallback activation path (no nonce, ±5min
-	// window): only a strictly increasing ts is accepted, which closes the
-	// replay gap a bare time window leaves open (see docs §4 note).
-	LastActivateTS int64
 
 	LastSeenAt *time.Time
 
@@ -92,25 +36,14 @@ type Device struct {
 
 func (Device) TableName() string { return "devices" }
 
-// DeviceToken is an issued session token (protocol §4 "设备激活"). Persisting
-// this — instead of the in-memory map the reference server used — is what
-// lets a device's session survive a server restart.
-type DeviceToken struct {
-	Token     string `gorm:"primaryKey;size:64"`
-	DeviceID  uint   `gorm:"not null;index"`
-	ExpiresAt time.Time
-	CreatedAt time.Time
-}
-
-func (DeviceToken) TableName() string { return "device_tokens" }
-
-// DeviceRecord is one persisted telemetry sample (protocol §5 recs[]). The
-// unique index on (device_id, ts) is what implements "同一(did,ts)去重" —
-// a duplicate insert is turned into a no-op (see store.SaveRecords) rather
-// than erroring or double-counting.
+// DeviceRecord is one persisted telemetry sample (protocol §4 payloads[]).
+// Data is the JSON-encoded field1..field20 -> value map (see §5 of the
+// doc); the unique index on (device_id, ts) is what implements "同一时间点
+// 去重" — a duplicate insert is turned into a no-op (see store.SaveRecords)
+// rather than erroring or double-counting.
 type DeviceRecord struct {
-	ID       uint `gorm:"primaryKey"`
-	DeviceID uint `gorm:"not null;uniqueIndex:idx_device_ts"`
+	ID       uint  `gorm:"primaryKey"`
+	DeviceID uint  `gorm:"not null;uniqueIndex:idx_device_ts"`
 	Ts       int64 `gorm:"not null;uniqueIndex:idx_device_ts"`
 	Data     string `gorm:"type:text;not null"`
 
@@ -118,68 +51,6 @@ type DeviceRecord struct {
 }
 
 func (DeviceRecord) TableName() string { return "device_records" }
-
-// Command lifecycle: Pending until the device acks or naks it.
-const (
-	CommandStatusPending = "pending"
-	CommandStatusAcked   = "acked"
-	CommandStatusNacked  = "nacked"
-)
-
-// DeviceCommand is one queued control instruction (protocol §7 cmd[]).
-// CmdID is the short id ("c123") the wire protocol uses for ack/nak;
-// keeping the row after it's acked (instead of deleting it, like the
-// in-memory reference server did) is what lets the admin UI show history.
-type DeviceCommand struct {
-	ID         uint   `gorm:"primaryKey"`
-	CmdID      string `gorm:"size:24;not null;uniqueIndex"`
-	DeviceID   uint   `gorm:"not null;index"`
-	Type       string `gorm:"size:24;not null"`
-	Args       string `gorm:"type:text"`
-	Status     string `gorm:"size:16;not null;default:pending"`
-	NakMessage string `gorm:"size:255"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (DeviceCommand) TableName() string { return "device_commands" }
-
-// Probe lifecycle: Pending until the set_probe command that (up)serted or
-// removed it is acked/nacked (see store.applyProbeCommandOutcome).
-const (
-	ProbeStatusPending  = "pending"
-	ProbeStatusApplied  = "applied"
-	ProbeStatusFailed   = "failed"
-	ProbeStatusRemoving = "removing"
-)
-
-// DeviceProbe is a custom sensor read configuration (protocol §7.2
-// set_probe) — RS485/Modbus register maps, analog scaling, etc. that can't
-// be baked into firmware because they vary by whatever's physically wired
-// to the device. Params holds the protocol-specific fields (addr/fc/reg/
-// cnt/dtype/byte_order/scale/offset/ci/timeout/retry) as a JSON blob
-// rather than one column each — the field set differs by iface/proto, and
-// exploding every combination into sparse columns wouldn't read any
-// clearer than the JSON the wire protocol already uses.
-type DeviceProbe struct {
-	ID       uint   `gorm:"primaryKey"`
-	DeviceID uint   `gorm:"not null;uniqueIndex:idx_device_pid"`
-	Pid      string `gorm:"size:32;not null;uniqueIndex:idx_device_pid"`
-	Key      string `gorm:"size:64;not null"`
-	Iface    string `gorm:"size:32;not null"`
-	Proto    string `gorm:"size:32;not null"`
-	Params   string `gorm:"type:text"`
-
-	Status        string `gorm:"size:16;not null;default:pending"`
-	LastCommandID string `gorm:"size:24"`
-	LastError     string `gorm:"size:255"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (DeviceProbe) TableName() string { return "device_probes" }
 
 // Alert types and statuses.
 const (
@@ -200,10 +71,12 @@ const (
 )
 
 // AlertRule is a per-device threshold check, evaluated against every
-// newly-saved telemetry record (see store.evaluateThresholdRules). Offline
-// detection has no rule row — it's a structural check against
-// Device.LastSeenAt run by the background sweep in cmd/server, not a
-// user-configured condition.
+// newly-saved telemetry record (see store.evaluateThresholdRules). Field is
+// free text — there's no fixed enum, so it works unchanged against the new
+// field1..field20 payload keys (see docs §5); an operator just types
+// "field1" (or whatever custom field they're watching). Offline detection
+// has no rule row — it's a structural check against Device.LastSeenAt run
+// by the background sweep in cmd/server, not a user-configured condition.
 type AlertRule struct {
 	ID        uint    `gorm:"primaryKey"`
 	DeviceID  uint    `gorm:"not null;index"`
@@ -249,11 +122,10 @@ const RoleSuper = "super_admin"
 // simplification — revisit if the permission set outgrows "one row per
 // role, one column of codes".
 const (
-	PermDeviceRead     = "device:read"
-	PermDeviceWrite    = "device:write"
-	PermCommandWrite   = "command:write"
-	PermAlertManage    = "alert:manage"
-	PermSystemManage   = "system:manage"
+	PermDeviceRead   = "device:read"
+	PermDeviceWrite  = "device:write"
+	PermAlertManage  = "alert:manage"
+	PermSystemManage = "system:manage"
 )
 
 // Role groups a set of permission codes under a name an AdminUser can be
@@ -283,9 +155,9 @@ type AdminUser struct {
 
 func (AdminUser) TableName() string { return "admin_users" }
 
-// AdminSession is an admin login session, deliberately the same
-// opaque-bearer-token-in-a-table shape as DeviceToken rather than JWT —
-// one session mechanism, one thing to reason about, no extra dependency.
+// AdminSession is an admin login session: an opaque bearer token in a
+// table rather than a JWT — one session mechanism, one thing to reason
+// about, no extra dependency.
 type AdminSession struct {
 	Token     string `gorm:"primaryKey;size:64"`
 	AdminID   uint   `gorm:"not null;index"`
@@ -313,61 +185,9 @@ type AuditLog struct {
 
 func (AuditLog) TableName() string { return "audit_logs" }
 
-// Firmware is an uploaded OTA image (protocol §7.3) plus the integrity
-// metadata devices need to safely apply it. The binary itself lives on
-// disk (Path) — sqlite is fine for metadata, not for multi-MB blobs.
-type Firmware struct {
-	ID        uint   `gorm:"primaryKey"`
-	PID       string `gorm:"size:64;not null;index"` // which product this firmware targets
-	Version   string `gorm:"size:32;not null"`
-	Filename  string `gorm:"size:255;not null"`
-	Path      string `gorm:"size:255;not null"`
-	Size      int64  `gorm:"not null"`
-	SHA256    string `gorm:"size:64;not null"`
-	Signature string `gorm:"size:512"` // optional, protocol §7.3 a.sig
-
-	CreatedAt time.Time
-}
-
-func (Firmware) TableName() string { return "firmwares" }
-
-// OTA task states (protocol §7.3's ota.state). Pending is this server's
-// own bookkeeping value for "dispatched, no progress reported yet" — it
-// never appears on the wire, the device only ever reports the states
-// from downloading onward.
-const (
-	OtaStatePending     = "pending"
-	OtaStateDownloading = "downloading"
-	OtaStateVerifying   = "verifying"
-	OtaStateFlashing    = "flashing"
-	OtaStateRebooting   = "rebooting"
-	OtaStateSuccess     = "success"
-	OtaStateFailed      = "failed"
-	OtaStateRolledBack  = "rolled_back"
-)
-
-// DeviceOTA tracks the single in-flight (or most recently finished) OTA
-// task for a device — one row per device, overwritten by each new
-// dispatch, since only one upgrade is ever in flight at a time.
-type DeviceOTA struct {
-	ID         uint   `gorm:"primaryKey"`
-	DeviceID   uint   `gorm:"not null;uniqueIndex"`
-	FirmwareID uint   `gorm:"not null"`
-	CmdID      string `gorm:"size:24;not null"`
-	Version    string `gorm:"size:32;not null"`
-	State      string `gorm:"size:16;not null"`
-	Progress   int
-	LastError  string `gorm:"size:255"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (DeviceOTA) TableName() string { return "device_otas" }
-
 // Notification levels/statuses/types (消息中心) — distinct from AlertEvent
-// (device-condition specific, shown in 告警中心): a Notification also
-// covers things like OTA outcomes and other system-level events.
+// (device-condition specific, shown in 告警中心): a Notification covers
+// system-level events more broadly.
 const (
 	NotificationLevelInfo     = "info"
 	NotificationLevelWarning  = "warning"
@@ -377,7 +197,6 @@ const (
 	NotificationStatusRead   = "read"
 
 	NotificationTypeAlert  = "alert"
-	NotificationTypeOta    = "ota"
 	NotificationTypeSystem = "system"
 )
 
@@ -396,44 +215,10 @@ type Notification struct {
 
 func (Notification) TableName() string { return "notifications" }
 
-// Scheduled-task schedule kinds — kept to these two common cases instead
-// of a full cron expression parser (which would also mean a new module
-// dependency this sandbox's restricted network can't necessarily fetch).
-const (
-	ScheduleTypeInterval = "interval"
-	ScheduleTypeDaily    = "daily"
-)
-
-// ScheduledTask periodically (or once, if disabled after the first run is
-// desired) queues a command for a device — e.g. a nightly reboot — without
-// an operator manually dispatching it each time. DeviceID 0 means "every
-// enabled device".
-type ScheduledTask struct {
-	ID       uint   `gorm:"primaryKey"`
-	Name     string `gorm:"size:128;not null"`
-	DeviceID uint   `gorm:"index"`
-	CmdType  string `gorm:"size:24;not null"`
-	CmdArgs  string `gorm:"type:text"`
-
-	ScheduleType    string `gorm:"size:16;not null"`
-	IntervalSeconds int
-	DailyAtMinute   int // minutes since local midnight, for daily schedules
-
-	Enabled   bool `gorm:"not null;default:true"`
-	NextRunAt time.Time
-	LastRunAt *time.Time
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-func (ScheduledTask) TableName() string { return "scheduled_tasks" }
-
 // ApiKey authenticates third-party integrations against the read-only
 // /api/open/v1 surface (see internal/api's RequireApiKey) — a separate
-// credential from admin sessions and device tokens, scoped narrower than
-// either. Only KeyHash is persisted; the raw key is shown once at
-// creation, the same pattern as a device secret.
+// credential from admin sessions, scoped narrower. Only KeyHash is
+// persisted; the raw key is shown once at creation.
 type ApiKey struct {
 	ID         uint   `gorm:"primaryKey"`
 	Name       string `gorm:"size:128;not null"`
@@ -447,9 +232,7 @@ type ApiKey struct {
 
 func (ApiKey) TableName() string { return "api_keys" }
 
-// FileAsset is a generic uploaded-file record (exports, attachments,
-// etc.) — separate from Firmware, which has its own OTA-specific
-// integrity columns and lifecycle.
+// FileAsset is a generic uploaded-file record (exports, attachments, etc).
 type FileAsset struct {
 	ID       uint   `gorm:"primaryKey"`
 	Category string `gorm:"size:32;not null;index"`
@@ -464,9 +247,8 @@ type FileAsset struct {
 func (FileAsset) TableName() string { return "file_assets" }
 
 // DictEntry is a small key/value enumeration operators can edit without a
-// deploy — e.g. display labels for command types. Type groups entries
-// into a named dictionary (e.g. "command_type"); Key is the stored value,
-// Label is what the UI shows for it.
+// deploy. Type groups entries into a named dictionary; Key is the stored
+// value, Label is what the UI shows for it.
 type DictEntry struct {
 	ID    uint   `gorm:"primaryKey"`
 	Type  string `gorm:"size:64;not null;index"`
@@ -494,10 +276,11 @@ type SystemParam struct {
 func (SystemParam) TableName() string { return "system_params" }
 
 // IconAsset is a custom SVG icon uploaded to override (or extend) the
-// built-in sensor-field icon set the "数据仓库" (data warehouse) page
-// renders. Key is the sensor field name it applies to (e.g. "temperature",
-// "co2", or any custom probe field name) -- at most one icon per key;
-// uploading again for the same key replaces it (see store.UpsertIcon).
+// built-in field icon set the "数据仓库" (data warehouse) page renders. Key
+// is the field it applies to -- "field1"/"field2"/"field3" by the doc's
+// default convention, or any custom field1..field20 name a deployment
+// chooses to give a distinct icon; at most one icon per key -- uploading
+// again for the same key replaces it (see store.UpsertIcon).
 type IconAsset struct {
 	ID   uint   `gorm:"primaryKey"`
 	Key  string `gorm:"size:64;not null;uniqueIndex"`

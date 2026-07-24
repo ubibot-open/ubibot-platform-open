@@ -21,13 +21,3 @@ func decodeJSON(r *http.Request, v any) error {
 	dec := json.NewDecoder(r.Body)
 	return dec.Decode(v)
 }
-
-// decodeJSONString unmarshals a JSON blob stored as a text column (e.g.
-// model.DeviceProbe.Params) into v, treating "" as a no-op rather than an
-// error — several of these text columns are legitimately empty.
-func decodeJSONString(s string, v any) error {
-	if s == "" {
-		return nil
-	}
-	return json.Unmarshal([]byte(s), v)
-}

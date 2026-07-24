@@ -14,10 +14,7 @@
   "info": {
     "title": "设备详情",
     "status": "状态",
-    "activated": "激活状态",
     "online": "在线状态",
-    "interval": "采集/上报间隔",
-    "seconds": "秒",
     "createdAt": "创建时间",
     "lastSeen": "最近上报"
   },

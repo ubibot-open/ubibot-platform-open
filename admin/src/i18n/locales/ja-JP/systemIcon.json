@@ -17,7 +17,7 @@
   "modal": {
     "title": "アイコンをアップロード",
     "keyLabel": "フィールドキー",
-    "keyPlaceholder": "例: temperature、co2、またはカスタムプローブのフィールド名",
+    "keyPlaceholder": "例: field1、field2、または任意の field4~field20 カスタムフィールド名",
     "keyExtraLocked": "ロック中 -- このフィールドのアイコンを置換します",
     "keyExtraHint": "上報されるセンサーデータのフィールド名と一致させる必要があります",
     "nameLabel": "名前",

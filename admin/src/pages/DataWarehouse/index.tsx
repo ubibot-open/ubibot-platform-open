@@ -74,12 +74,11 @@ export default function DataWarehousePage() {
     const fieldKeys = Array.from(
       new Set(filtered.flatMap((it) => (it.last_record ? Object.keys(it.last_record.d) : []))),
     ).sort()
-    const header = ['name', 'sn', 'pid', 'activated', 'online', 'last_seen_at', 'created_at', ...fieldKeys]
+    const header = ['name', 'sn', 'pid', 'online', 'last_seen_at', 'created_at', ...fieldKeys]
     const rows = filtered.map((it) => [
       it.name || it.sn,
       it.sn,
       it.pid,
-      it.activated ? t('activated.yes') : t('activated.no'),
       it.online ? t('online.yes') : t('online.no'),
       it.last_seen_at ? new Date(it.last_seen_at * 1000).toISOString() : '',
       new Date(it.created_at * 1000).toISOString(),
@@ -225,11 +224,6 @@ export default function DataWarehousePage() {
                       <Tag color="green">{t('online.yes')}</Tag>
                     ) : (
                       <Tag color="default">{t('online.no')}</Tag>
-                    )}
-                    {it.activated ? (
-                      <Tag color="blue">{t('activated.yes')}</Tag>
-                    ) : (
-                      <Tag color="default">{t('activated.no')}</Tag>
                     )}
                   </Space>
                   <div style={{ marginBottom: 8 }}>{renderSensorTags(it)}</div>

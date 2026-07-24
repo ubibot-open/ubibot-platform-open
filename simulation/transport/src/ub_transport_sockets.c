@@ -36,9 +36,6 @@ typedef int ub_sock_t;
 #define UB_INVALID_SOCKET (-1)
 #endif
 
-#define UB_DL_HDR_BUF 2048
-#define UB_DL_CHUNK_BUF 4096
-
 static void ensure_wsa_ready(void) {
 #ifdef _WIN32
     static int wsa_ready = 0;
@@ -89,8 +86,8 @@ static int send_all(ub_sock_t fd, const char *data, size_t len) {
 
 /* Reads a full HTTP response (status line + headers + whole body) into a
  * bounded static buffer, relying on the server honoring our
- * "Connection: close" request to signal end-of-body. Shared by post/get,
- * both of which always expect a small JSON body that comfortably fits. */
+ * "Connection: close" request to signal end-of-body. Both device endpoints
+ * only ever exchange a small JSON body that comfortably fits. */
 static int recv_full_response(ub_sock_t fd, int *status, char *resp_buf, size_t resp_cap,
                                size_t *resp_len) {
     static char raw[8192];
@@ -123,27 +120,15 @@ static int recv_full_response(ub_sock_t fd, int *status, char *resp_buf, size_t 
 }
 
 static int ub_sock_post(void *user_ctx, const char *host, int port, const char *path,
-                         const char *body, size_t body_len, const char *token_header_value,
-                         int *status, char *resp_buf, size_t resp_cap, size_t *resp_len) {
+                         const char *body, size_t body_len, int *status, char *resp_buf,
+                         size_t resp_cap, size_t *resp_len) {
     (void)user_ctx;
 
     ub_sock_t fd = connect_to(host, port);
     if (fd == UB_INVALID_SOCKET) return -1;
 
     char header[512];
-    int header_len;
-    if (token_header_value && token_header_value[0] != '\0') {
-        header_len = snprintf(header, sizeof(header),
-                               "POST %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "Content-Type: application/json\r\n"
-                               "X-IoT-Token: %s\r\n"
-                               "Content-Length: %zu\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host, token_header_value, body_len);
-    } else {
-        header_len = snprintf(header, sizeof(header),
+    int header_len = snprintf(header, sizeof(header),
                                "POST %s HTTP/1.1\r\n"
                                "Host: %s\r\n"
                                "Content-Type: application/json\r\n"
@@ -151,7 +136,6 @@ static int ub_sock_post(void *user_ctx, const char *host, int port, const char *
                                "Connection: close\r\n"
                                "\r\n",
                                path, host, body_len);
-    }
     if (header_len < 0 || (size_t)header_len >= sizeof(header)) {
         UB_CLOSESOCK(fd);
         return -1;
@@ -167,167 +151,7 @@ static int ub_sock_post(void *user_ctx, const char *host, int port, const char *
     return rc;
 }
 
-static int ub_sock_get(void *user_ctx, const char *host, int port, const char *path,
-                        const char *token_header_value, int *status, char *resp_buf,
-                        size_t resp_cap, size_t *resp_len) {
-    (void)user_ctx;
-
-    ub_sock_t fd = connect_to(host, port);
-    if (fd == UB_INVALID_SOCKET) return -1;
-
-    char header[512];
-    int header_len;
-    if (token_header_value && token_header_value[0] != '\0') {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "X-IoT-Token: %s\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host, token_header_value);
-    } else {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host);
-    }
-    if (header_len < 0 || (size_t)header_len >= sizeof(header)) {
-        UB_CLOSESOCK(fd);
-        return -1;
-    }
-    if (send_all(fd, header, (size_t)header_len) != 0) {
-        UB_CLOSESOCK(fd);
-        return -1;
-    }
-
-    int rc = recv_full_response(fd, status, resp_buf, resp_cap, resp_len);
-    UB_CLOSESOCK(fd);
-    return rc;
-}
-
-static int ub_sock_download(void *user_ctx, const char *host, int port, const char *path,
-                             const char *token_header_value, long range_start, int *status,
-                             long *content_length, ub_transport_chunk_fn on_chunk,
-                             void *chunk_ctx) {
-    (void)user_ctx;
-    *content_length = -1;
-
-    ub_sock_t fd = connect_to(host, port);
-    if (fd == UB_INVALID_SOCKET) return -1;
-
-    char header[512];
-    int header_len;
-    if (range_start > 0 && token_header_value && token_header_value[0] != '\0') {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "X-IoT-Token: %s\r\n"
-                               "Range: bytes=%ld-\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host, token_header_value, range_start);
-    } else if (range_start > 0) {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "Range: bytes=%ld-\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host, range_start);
-    } else if (token_header_value && token_header_value[0] != '\0') {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "X-IoT-Token: %s\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host, token_header_value);
-    } else {
-        header_len = snprintf(header, sizeof(header),
-                               "GET %s HTTP/1.1\r\n"
-                               "Host: %s\r\n"
-                               "Connection: close\r\n"
-                               "\r\n",
-                               path, host);
-    }
-    if (header_len < 0 || (size_t)header_len >= sizeof(header)) {
-        UB_CLOSESOCK(fd);
-        return -1;
-    }
-    if (send_all(fd, header, (size_t)header_len) != 0) {
-        UB_CLOSESOCK(fd);
-        return -1;
-    }
-
-    /* Read until we have the full header block ("\r\n\r\n"). Bytes read past
-     * that point in the same recv() call are real body bytes and must not
-     * be dropped -- they're delivered to on_chunk first, below, before we
-     * go back to plain streaming reads. */
-    static char hdr[UB_DL_HDR_BUF];
-    size_t hdr_len = 0;
-    const char *body_in_hdr = NULL;
-    for (;;) {
-        if (hdr_len >= sizeof(hdr) - 1) {
-            UB_CLOSESOCK(fd);
-            return -1; /* headers implausibly large; treat as a bad response */
-        }
-        int n = recv(fd, hdr + hdr_len, (int)(sizeof(hdr) - 1 - hdr_len), 0);
-        if (n <= 0) {
-            UB_CLOSESOCK(fd);
-            return -1;
-        }
-        hdr_len += (size_t)n;
-        hdr[hdr_len] = '\0';
-        char *sep = strstr(hdr, "\r\n\r\n");
-        if (sep) {
-            body_in_hdr = sep + 4;
-            break;
-        }
-    }
-
-    const char *sp = strchr(hdr, ' ');
-    if (!sp) {
-        UB_CLOSESOCK(fd);
-        return -1;
-    }
-    *status = atoi(sp + 1);
-
-    const char *cl = strstr(hdr, "Content-Length:");
-    if (cl) {
-        *content_length = atol(cl + strlen("Content-Length:"));
-    }
-
-    size_t leftover_len = hdr_len - (size_t)(body_in_hdr - hdr);
-    if (leftover_len > 0) {
-        if (on_chunk(chunk_ctx, (const uint8_t *)body_in_hdr, leftover_len) != 0) {
-            UB_CLOSESOCK(fd);
-            return -1;
-        }
-    }
-
-    uint8_t chunk[UB_DL_CHUNK_BUF];
-    for (;;) {
-        int n = recv(fd, (char *)chunk, sizeof(chunk), 0);
-        if (n < 0) {
-            UB_CLOSESOCK(fd);
-            return -1;
-        }
-        if (n == 0) break; /* peer closed: end of body (Connection: close) */
-        if (on_chunk(chunk_ctx, chunk, (size_t)n) != 0) {
-            UB_CLOSESOCK(fd);
-            return -1;
-        }
-    }
-
-    UB_CLOSESOCK(fd);
-    return 0;
-}
-
 void ub_sockets_transport_init(ub_transport_t *tr) {
     tr->post = ub_sock_post;
-    tr->get = ub_sock_get;
-    tr->download = ub_sock_download;
     tr->user_ctx = NULL;
 }

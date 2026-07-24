@@ -5,33 +5,28 @@
  * simulation/freertos_port/README.md).
  *
  * Usage:
- *   ub_device_sim [--host H] [--port P] [--pid PID] [--sn SN]
- *                 [--secret SECRET] [--data-dir DIR] [--tick-ms MS]
+ *   ub_device_sim [--host H] [--port P] [--pid PID] [--sn SN] [--tick-ms MS]
  *
  * Defaults match the demo device seeded by cmd/server/main.go, so running
  * with no arguments against a locally started server (`go run ./cmd/server`)
  * works out of the box.
+ *
+ * There is no --secret flag any more: the protocol has no device secret,
+ * signature, or activation step at all (see docs/UbiBot开放平台硬件通信协议.md).
+ * There is also no --data-dir flag: nothing needs to survive a restart
+ * (no session token, no server-pushed config), so the simulator has no
+ * persisted state to store anywhere.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef _WIN32
-#include <direct.h>
-#define ub_mkdir(path) _mkdir(path)
-#else
-#include <sys/stat.h>
-#define ub_mkdir(path) mkdir(path, 0755)
-#endif
 
 #include "ub_device.h"
 #include "ub_platform.h"
 #include "ub_transport_sockets.h"
 
 static void print_usage(const char *prog) {
-    fprintf(stderr,
-            "usage: %s [--host H] [--port P] [--pid PID] [--sn SN] [--secret S]\n"
-            "          [--data-dir DIR] [--tick-ms MS]\n",
+    fprintf(stderr, "usage: %s [--host H] [--port P] [--pid PID] [--sn SN] [--tick-ms MS]\n",
             prog);
 }
 
@@ -40,10 +35,8 @@ int main(int argc, char **argv) {
     memset(&cfg, 0, sizeof(cfg));
     snprintf(cfg.pid, sizeof(cfg.pid), "ubibot_open_dev_v1");
     snprintf(cfg.sn, sizeof(cfg.sn), "sn_ws1_20001_1");
-    snprintf(cfg.secret, sizeof(cfg.secret), "demo-secret-change-me");
     snprintf(cfg.server_host, sizeof(cfg.server_host), "127.0.0.1");
     cfg.server_port = 8080;
-    snprintf(cfg.data_dir, sizeof(cfg.data_dir), "./ub_sim_data");
 
     uint32_t tick_ms = 1000;
 
@@ -56,10 +49,6 @@ int main(int argc, char **argv) {
             snprintf(cfg.pid, sizeof(cfg.pid), "%s", argv[++i]);
         } else if (strcmp(argv[i], "--sn") == 0 && i + 1 < argc) {
             snprintf(cfg.sn, sizeof(cfg.sn), "%s", argv[++i]);
-        } else if (strcmp(argv[i], "--secret") == 0 && i + 1 < argc) {
-            snprintf(cfg.secret, sizeof(cfg.secret), "%s", argv[++i]);
-        } else if (strcmp(argv[i], "--data-dir") == 0 && i + 1 < argc) {
-            snprintf(cfg.data_dir, sizeof(cfg.data_dir), "%s", argv[++i]);
         } else if (strcmp(argv[i], "--tick-ms") == 0 && i + 1 < argc) {
             tick_ms = (uint32_t)atoi(argv[++i]);
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -72,10 +61,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    ub_mkdir(cfg.data_dir); /* best-effort; ub_storage_load/save tolerate it already existing */
-
-    ub_platform_log("ubibot device simulator starting: pid=%s sn=%s server=%s:%d data_dir=%s",
-                     cfg.pid, cfg.sn, cfg.server_host, cfg.server_port, cfg.data_dir);
+    ub_platform_log("ubibot device simulator starting: pid=%s sn=%s server=%s:%d", cfg.pid,
+                     cfg.sn, cfg.server_host, cfg.server_port);
 
     ub_transport_t transport;
     ub_sockets_transport_init(&transport);

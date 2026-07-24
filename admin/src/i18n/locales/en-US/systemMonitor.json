@@ -8,7 +8,6 @@
     "heapAlloc": "Heap Memory",
     "dbSize": "Database File Size",
     "deviceTotal": "Total Devices",
-    "pendingCommands": "Pending Commands",
     "openAlerts": "Active Alerts",
     "unreadNotifications": "Unread Notifications"
   },

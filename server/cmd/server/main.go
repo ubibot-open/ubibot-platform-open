@@ -1,6 +1,6 @@
 // Command server runs the UbiBot device-facing HTTP API described in
 // docs/UbiBot开放平台硬件通信协议.md, plus the minimal admin API (login,
-// device management, command dispatch) that sits on the same store.
+// device management) that sits on the same store.
 package main
 
 import (
@@ -46,17 +46,7 @@ func main() {
 	srv := api.NewServer(st)
 	srv.DBPath = dbPath
 	dataDir := filepath.Dir(dbPath)
-	srv.FirmwareDir = filepath.Join(dataDir, "firmware")
 	srv.FileDir = filepath.Join(dataDir, "files")
-
-	// See docs §4.1: this keypair lets a self-registration provisioning
-	// tool hand the platform a pre-manufactured device's real secret
-	// without it ever crossing the network unencrypted.
-	keyPair, err := auth.LoadOrCreateServerKeyPair(filepath.Join(dataDir, "keys"))
-	if err != nil {
-		log.Fatalf("load/create server keypair: %v", err)
-	}
-	srv.ServerKeyPair = keyPair
 
 	if err := seedDefaultParams(st); err != nil {
 		log.Fatalf("seed default params: %v", err)
@@ -78,10 +68,6 @@ func main() {
 	// process.
 	go runOfflineSweepLoop(st, 30*time.Second)
 
-	// Scheduled command dispatch (定时任务) — checked more often than the
-	// offline sweep since interval-based tasks can be as short as a minute.
-	go runScheduledTaskLoop(st, 15*time.Second)
-
 	addr := os.Getenv("UBIBOT_LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"
@@ -99,16 +85,6 @@ func runOfflineSweepLoop(st *store.Store, interval time.Duration) {
 	for range ticker.C {
 		if err := st.OfflineSweep(time.Now()); err != nil {
 			log.Printf("offline sweep error: %v", err)
-		}
-	}
-}
-
-func runScheduledTaskLoop(st *store.Store, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for range ticker.C {
-		if err := st.RunDueScheduledTasks(time.Now()); err != nil {
-			log.Printf("scheduled task run error: %v", err)
 		}
 	}
 }
@@ -199,22 +175,19 @@ func bootstrapAdmin(st *store.Store) error {
 	return nil
 }
 
-// seedDemoDevice provisions the same demo triple the in-memory reference
-// server used to hardcode, but only once — so the API is usable out of the
-// box without every restart re-registering it as if nothing had happened.
+// seedDemoDevice pre-creates the same demo device the simulator/README
+// point at by default, purely so there's something to look at in 设备管理
+// immediately after a first run — it is in no way required: per docs §4,
+// any device just starts appearing the moment it successfully reports,
+// with no pre-registration step at all.
 func seedDemoDevice(st *store.Store) error {
 	const sn = "sn_ws1_20001_1"
-	_, err := st.DeviceBySN(sn)
-	if err == nil {
-		return nil // already provisioned
-	}
-	if !errors.Is(err, store.ErrNotFound) {
+	_, created, err := st.GetOrCreateDeviceBySN("ubibot_open_dev_v1", sn)
+	if err != nil {
 		return err
 	}
-
-	if _, err := st.CreateDevice("ubibot_open_dev_v1", sn, "demo-secret-change-me", "示例设备"); err != nil {
-		return err
+	if created {
+		log.Printf("seeded demo device sn=%s", sn)
 	}
-	log.Printf("seeded demo device sn=%s (secret: demo-secret-change-me)", sn)
 	return nil
 }

@@ -10,8 +10,7 @@ import (
 )
 
 // CreateFileAsset records a generic uploaded file (exports, attachments,
-// etc. — separate from Firmware, which has its own OTA-specific columns).
-// The caller has already written the bytes to path.
+// etc). The caller has already written the bytes to path.
 func (s *Store) CreateFileAsset(category, filename, path string, size int64, sha256 string) (*model.FileAsset, error) {
 	f := &model.FileAsset{Category: category, Filename: filename, Path: path, Size: size, SHA256: sha256}
 	if err := s.db.Create(f).Error; err != nil {

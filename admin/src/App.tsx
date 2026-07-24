@@ -12,13 +12,10 @@ import DeviceDetailPage from './pages/Device/Detail'
 import DataWarehousePage from './pages/DataWarehouse'
 import DataWarehouseDeviceDetailPage from './pages/DataWarehouse/DeviceDetail'
 import MonitorPage from './pages/Monitor'
-import CommandPage from './pages/Command'
 import AlertPage from './pages/Alert'
 import AdminUserPage from './pages/System/Admin'
 import RolePage from './pages/System/Role'
 import AuditLogPage from './pages/System/Log'
-import SchedulePage from './pages/System/Schedule'
-import FirmwarePage from './pages/System/Firmware'
 import ApiKeyPage from './pages/System/ApiKey'
 import FilesPage from './pages/System/Files'
 import DictPage from './pages/System/Dict'
@@ -56,10 +53,7 @@ export default function App() {
               <Route path="/data-warehouse" element={<DataWarehousePage />} />
               <Route path="/data-warehouse/:id" element={<DataWarehouseDeviceDetailPage />} />
               <Route path="/monitor" element={<MonitorPage />} />
-              <Route path="/command" element={<CommandPage />} />
               <Route path="/alert" element={<AlertPage />} />
-              <Route path="/schedule" element={<SchedulePage />} />
-              <Route path="/firmware" element={<FirmwarePage />} />
               <Route path="/device-management" element={<Navigate to="/device" replace />} />
               <Route path="/data-warehouse-group" element={<Navigate to="/data-warehouse" replace />} />
               <Route path="/system/admin" element={<AdminUserPage />} />

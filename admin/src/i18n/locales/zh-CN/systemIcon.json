@@ -17,7 +17,7 @@
   "modal": {
     "title": "上传图标",
     "keyLabel": "字段Key",
-    "keyPlaceholder": "如 temperature、co2，或自定义探头字段名",
+    "keyPlaceholder": "如 field1、field2，或任意 field4~field20 自定义字段名",
     "keyExtraLocked": "已锁定，替换该字段的图标",
     "keyExtraHint": "对应数据仓库中传感器数据的字段名，需与上报数据的key一致",
     "nameLabel": "名称",

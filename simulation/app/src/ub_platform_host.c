@@ -1,7 +1,7 @@
 /* Host implementation of ub_platform.h for the Linux/Windows simulator.
  * Firmware provides an equivalent over FreeRTOS primitives (vTaskDelay,
- * a UART printf, esp_restart()/NVIC_SystemReset(), ...); nothing that
- * includes only ub_platform.h needs to change. */
+ * a UART printf, ...); nothing that includes only ub_platform.h needs to
+ * change. */
 #ifndef _WIN32
 /* clock_gettime/CLOCK_MONOTONIC and usleep need this feature-test macro
  * exposed under -std=c11's strict mode (glibc hides them otherwise). */
@@ -12,7 +12,6 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -23,8 +22,8 @@
 
 /* The host's own wall clock is already correct, but we still honor
  * ub_platform_set_time via an offset so the simulator behaves like a
- * device with no RTC that only trusts the server's clock -- useful for
- * exercising the warm-boot activation path deterministically. */
+ * device with no RTC that only trusts the server's clock (learned via
+ * /auth/time or the "t" field of a report response). */
 static int64_t g_time_offset = 0;
 
 int64_t ub_platform_now(void) { return (int64_t)time(NULL) + g_time_offset; }
@@ -65,12 +64,6 @@ void ub_platform_sleep_ms(uint32_t ms) {
     ts.tv_nsec = (long)(ms % 1000) * 1000000L;
     nanosleep(&ts, NULL);
 #endif
-}
-
-void ub_platform_reboot(void) {
-    ub_platform_log("*** reboot requested -- exiting process to simulate an MCU reset ***");
-    ub_platform_log("*** re-run the simulator to resume as the post-reboot device ***");
-    exit(0);
 }
 
 void ub_platform_log(const char *fmt, ...) {

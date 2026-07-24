@@ -8,7 +8,6 @@
     "heapAlloc": "堆内存占用",
     "dbSize": "数据库文件大小",
     "deviceTotal": "设备总数",
-    "pendingCommands": "待确认指令",
     "openAlerts": "进行中告警",
     "unreadNotifications": "未读通知"
   },

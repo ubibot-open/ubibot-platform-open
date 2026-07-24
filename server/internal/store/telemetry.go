@@ -10,23 +10,23 @@ import (
 	"github.com/ubibot/ubibot-platform-open/internal/protocol"
 )
 
-// SaveRecords persists recs for deviceID. Duplicate (device_id, ts) pairs
-// are silently ignored via ON CONFLICT DO NOTHING against the unique index
-// on model.DeviceRecord — this is the "同一(did,ts)去重" requirement,
+// SaveRecords persists payloads for deviceID. Duplicate (device_id, ts)
+// pairs are silently ignored via ON CONFLICT DO NOTHING against the unique
+// index on model.DeviceRecord — this is the "同一时间点去重" requirement,
 // enforced by the database instead of an application-level check-then-
 // insert (which would race under concurrent uploads).
-func (s *Store) SaveRecords(deviceID uint, recs []protocol.Record) error {
-	if len(recs) == 0 {
+func (s *Store) SaveRecords(deviceID uint, payloads []protocol.Payload) error {
+	if len(payloads) == 0 {
 		return nil
 	}
 
-	rows := make([]model.DeviceRecord, 0, len(recs))
-	for _, r := range recs {
-		data, err := json.Marshal(r.D)
+	rows := make([]model.DeviceRecord, 0, len(payloads))
+	for _, p := range payloads {
+		data, err := json.Marshal(p.Feed)
 		if err != nil {
 			return err
 		}
-		rows = append(rows, model.DeviceRecord{DeviceID: deviceID, Ts: r.Ts, Data: string(data)})
+		rows = append(rows, model.DeviceRecord{DeviceID: deviceID, Ts: p.Ts, Data: string(data)})
 	}
 
 	return s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error

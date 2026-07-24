@@ -15,7 +15,6 @@ import { model } from '../../constants/model'
 const permissionLabelKeys: Record<string, string> = {
   'device:read': 'permissionLabels.deviceRead',
   'device:write': 'permissionLabels.deviceWrite',
-  'command:write': 'permissionLabels.commandWrite',
   'alert:manage': 'permissionLabels.alertManage',
   'system:manage': 'permissionLabels.systemManage',
   '*': 'permissionLabels.all',

@@ -4,7 +4,6 @@ export interface DashboardSummary {
   device_total: number
   device_online: number
   open_alerts: number
-  pending_commands: number
   today_records: number
 }
 

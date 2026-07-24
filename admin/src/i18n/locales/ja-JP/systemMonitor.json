@@ -8,7 +8,6 @@
     "heapAlloc": "ヒープメモリ使用量",
     "dbSize": "データベースファイルサイズ",
     "deviceTotal": "デバイス総数",
-    "pendingCommands": "確認待ちコマンド",
     "openAlerts": "発生中のアラート",
     "unreadNotifications": "未読通知"
   },

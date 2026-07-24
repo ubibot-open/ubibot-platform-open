@@ -14,10 +14,7 @@
   "info": {
     "title": "デバイス詳細",
     "status": "状態",
-    "activated": "アクティベート状態",
     "online": "オンライン状態",
-    "interval": "サンプリング/上報間隔",
-    "seconds": "秒",
     "createdAt": "作成日時",
     "lastSeen": "最終上報"
   },

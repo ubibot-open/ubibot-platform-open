@@ -23,8 +23,7 @@
   },
   "permissionLabels": {
     "deviceRead": "Device View",
-    "deviceWrite": "Device Management (incl. probe configuration)",
-    "commandWrite": "Command Dispatch",
+    "deviceWrite": "Device Management",
     "alertManage": "Alert Management",
     "systemManage": "System Management (Roles/Admins/Logs)",
     "all": "All Permissions"

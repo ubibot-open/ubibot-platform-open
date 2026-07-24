@@ -16,16 +16,16 @@ import (
 )
 
 const (
-	testPID    = "ubibot_open_dev_v1"
-	testSN     = "sn_ws1_20001_1"
-	testSecret = "test-secret"
+	testPID = "ubibot_open_dev_v1"
+	testSN  = "sn_ws1_20001_1"
 )
 
-// testEnv bundles a router with a device already provisioned and a clock
-// the test controls, so nonce/token expiry and the activation time window
-// can be exercised deterministically instead of racing the wall clock.
-// Each test gets its own in-memory database (via a unique DSN) so tests
-// can run in parallel without stepping on each other's rows.
+// testEnv bundles a router with a device already provisioned (via the same
+// GetOrCreateDeviceBySN path a real first report takes) and a clock the
+// test controls, so the ±5min report window and offline-grace assertions
+// can be exercised deterministically instead of racing the wall clock. Each
+// test gets its own in-memory database (via a unique DSN) so tests can run
+// in parallel without stepping on each other's rows.
 type testEnv struct {
 	router http.Handler
 	srv    *api.Server
@@ -42,9 +42,9 @@ func newTestEnv(t *testing.T) *testEnv {
 		t.Fatalf("open store: %v", err)
 	}
 
-	dev, err := st.CreateDevice(testPID, testSN, testSecret, "test device")
+	dev, _, err := st.GetOrCreateDeviceBySN(testPID, testSN)
 	if err != nil {
-		t.Fatalf("create device: %v", err)
+		t.Fatalf("provision device: %v", err)
 	}
 
 	srv := api.NewServer(st)
@@ -80,120 +80,59 @@ func (e *testEnv) do(t *testing.T, method, path string, body interface{}, header
 	return rec, parsed
 }
 
-func (e *testEnv) sign(parts ...string) string {
-	return auth.Sign(testSecret, parts...)
+// report is a small helper building a docs-§4-shaped report body: one
+// payload with the given ts and feed.
+func report(sn string, ts int64, feed map[string]any) map[string]any {
+	return map[string]any{
+		"pid": testPID, "sn": sn, "ts": ts,
+		"payloads": []map[string]any{{"ts": ts, "feed": feed}},
+	}
 }
 
-// activateViaNonce runs the time-sync + activate handshake and returns the
-// issued session token.
-func (e *testEnv) activateViaNonce(t *testing.T) string {
-	t.Helper()
-
-	_, timeBody := e.do(t, "POST", "/api/v1/auth/time", map[string]any{
-		"pid": testPID, "sn": testSN, "sign": e.sign(testPID, testSN),
-	}, nil)
-	n := timeBody["n"].(string)
-	ts := int64(timeBody["t"].(float64))
-
-	_, actBody := e.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": ts, "n": n,
-		"sign": e.sign(testPID, testSN, auth.FormatTs(ts), n),
-	}, nil)
-	return actBody["token"].(string)
-}
-
-func TestTimeSyncAndActivate_NonceReplayRejected(t *testing.T) {
+func TestTimeSync_ReturnsServerTime(t *testing.T) {
 	env := newTestEnv(t)
 
 	rec, body := env.do(t, "POST", "/api/v1/auth/time", map[string]any{
-		"pid": testPID, "sn": testSN, "sign": env.sign(testPID, testSN),
+		"pid": testPID, "sn": testSN,
 	}, nil)
 	if rec.Code != 200 || body["c"].(float64) != 0 {
 		t.Fatalf("time sync failed: %d %v", rec.Code, body)
 	}
-	n := body["n"].(string)
-	ts := int64(body["t"].(float64))
-	sign := env.sign(testPID, testSN, auth.FormatTs(ts), n)
-
-	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": ts, "n": n, "sign": sign,
-	}, nil)
-	if rec.Code != 200 || body["token"] == "" {
-		t.Fatalf("activate failed: %d %v", rec.Code, body)
-	}
-
-	// Replaying the exact same signed request must fail: the nonce was
-	// already consumed.
-	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": ts, "n": n, "sign": sign,
-	}, nil)
-	if rec.Code == 200 {
-		t.Fatalf("expected nonce replay to be rejected, got 200: %v", body)
+	if int64(body["t"].(float64)) != env.now.Unix() {
+		t.Fatalf("expected server time %d, got %v", env.now.Unix(), body["t"])
 	}
 }
 
-func TestActivate_LocalClockPath_MonotonicTsRequired(t *testing.T) {
+func TestTimeSync_RejectsMalformedBody(t *testing.T) {
 	env := newTestEnv(t)
-	ts := env.now.Unix()
-	sign := env.sign(testPID, testSN, auth.FormatTs(ts), "")
 
-	rec, body := env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": ts, "sign": sign,
-	}, nil)
-	if rec.Code != 200 {
-		t.Fatalf("first activation should succeed: %d %v", rec.Code, body)
-	}
-
-	// Same ts again (a replayed request within the ±5min window) must be
-	// rejected — this is the monotonic guard closing the window-replay gap.
-	rec, _ = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": ts, "sign": sign,
-	}, nil)
-	if rec.Code == 200 {
-		t.Fatalf("expected replayed ts to be rejected")
-	}
-
-	// An older ts must also be rejected, even if still within the window.
-	olderTs := ts - 1
-	rec, _ = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": olderTs,
-		"sign": env.sign(testPID, testSN, auth.FormatTs(olderTs), ""),
-	}, nil)
-	if rec.Code == 200 {
-		t.Fatalf("expected older ts to be rejected")
-	}
-
-	// A strictly greater ts must succeed.
-	newerTs := ts + 1
-	rec, body = env.do(t, "POST", "/api/v1/auth/activate", map[string]any{
-		"pid": testPID, "sn": testSN, "ts": newerTs,
-		"sign": env.sign(testPID, testSN, auth.FormatTs(newerTs), ""),
-	}, nil)
-	if rec.Code != 200 {
-		t.Fatalf("expected advancing ts to succeed: %d %v", rec.Code, body)
+	rec, body := env.do(t, "POST", "/api/v1/auth/time", map[string]any{"pid": testPID}, nil)
+	if rec.Code != 400 || body["c"].(float64) != 1003 {
+		t.Fatalf("expected malformed-body rejection, got %d %v", rec.Code, body)
 	}
 }
 
-func TestReport_DedupAndDidBinding(t *testing.T) {
+func TestReport_AutoCreatesUnseenDeviceAndDedupesByTs(t *testing.T) {
 	env := newTestEnv(t)
-	token := env.activateViaNonce(t)
+	const newSN = "sn_new_device_1"
 
-	rec, body := env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did":  testSN,
-		"recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 25.6}}},
-	}, map[string]string{"X-IoT-Token": token})
+	rec, body := env.do(t, "POST", "/api/v1/data/report",
+		report(newSN, env.now.Unix(), map[string]any{"field1": 25.6}), nil)
 	if rec.Code != 200 || body["c"].(float64) != 0 {
 		t.Fatalf("report failed: %d %v", rec.Code, body)
 	}
 
-	// Same (did, ts) again with a different value must not overwrite —
-	// the unique index + ON CONFLICT DO NOTHING makes this a no-op.
-	env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did":  testSN,
-		"recs": []map[string]any{{"ts": 1000, "d": map[string]any{"temperature": 999}}},
-	}, map[string]string{"X-IoT-Token": token})
+	dev, err := env.srv.Store.DeviceBySN(newSN)
+	if err != nil {
+		t.Fatalf("expected the unseen SN to have been auto-created: %v", err)
+	}
 
-	records, err := env.srv.Store.RecentRecords(env.dev.ID, 10)
+	// Same (device, ts) again with a different value must not overwrite —
+	// the unique index + ON CONFLICT DO NOTHING makes this a no-op.
+	env.do(t, "POST", "/api/v1/data/report",
+		report(newSN, env.now.Unix(), map[string]any{"field1": 999}), nil)
+
+	records, err := env.srv.Store.RecentRecords(dev.ID, 10)
 	if err != nil {
 		t.Fatalf("recent records: %v", err)
 	}
@@ -202,42 +141,35 @@ func TestReport_DedupAndDidBinding(t *testing.T) {
 	}
 	var d map[string]any
 	_ = json.Unmarshal([]byte(records[0].Data), &d)
-	if d["temperature"].(float64) != 25.6 {
-		t.Fatalf("expected the first value to win, got %v", d["temperature"])
-	}
-
-	// A report whose did doesn't match the token's device must be rejected
-	// (protects against a token holder reporting as an arbitrary did).
-	rec, body = env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did":  "some-other-device",
-		"recs": []map[string]any{{"ts": 1001, "d": map[string]any{"temperature": 1}}},
-	}, map[string]string{"X-IoT-Token": token})
-	if rec.Code == 200 {
-		t.Fatalf("expected did/token mismatch to be rejected: %v", body)
+	if d["field1"].(float64) != 25.6 {
+		t.Fatalf("expected the first value to win, got %v", d["field1"])
 	}
 }
 
-func TestReport_MissingOrInvalidToken(t *testing.T) {
+func TestReport_RejectsMalformedBody(t *testing.T) {
 	env := newTestEnv(t)
 
-	rec, _ := env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1, "d": map[string]any{}}},
+	rec, body := env.do(t, "POST", "/api/v1/data/report", map[string]any{
+		"pid": testPID, "sn": testSN,
 	}, nil)
-	if rec.Code != 401 {
-		t.Fatalf("expected 401 for missing token, got %d", rec.Code)
-	}
-
-	rec, _ = env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did": testSN, "recs": []map[string]any{{"ts": 1, "d": map[string]any{}}},
-	}, map[string]string{"X-IoT-Token": "not-a-real-token"})
-	if rec.Code != 401 {
-		t.Fatalf("expected 401 for invalid token, got %d", rec.Code)
+	if rec.Code != 400 || body["c"].(float64) != 1003 {
+		t.Fatalf("expected malformed-body rejection for a missing ts/payloads, got %d %v", rec.Code, body)
 	}
 }
 
-func TestAdminLoginAndCommandDispatchFlow(t *testing.T) {
+func TestReport_RejectsTimestampOutsideWindow(t *testing.T) {
 	env := newTestEnv(t)
-	deviceToken := env.activateViaNonce(t)
+
+	future := env.now.Add(10 * time.Minute).Unix()
+	rec, body := env.do(t, "POST", "/api/v1/data/report",
+		report(testSN, future, map[string]any{"field1": 20}), nil)
+	if rec.Code != 400 || body["c"].(float64) != 1002 {
+		t.Fatalf("expected timestamp-out-of-window rejection, got %d %v", rec.Code, body)
+	}
+}
+
+func TestAdminLoginAndDeviceListFlow(t *testing.T) {
+	env := newTestEnv(t)
 
 	role, err := env.srv.Store.CreateRole("超级管理员", model.RoleSuper, []string{"*"})
 	if err != nil {
@@ -271,7 +203,7 @@ func TestAdminLoginAndCommandDispatchFlow(t *testing.T) {
 		t.Fatalf("expected 401 without session, got %d", rec.Code)
 	}
 
-	// List devices shows the provisioned device.
+	// List devices shows the seeded device.
 	rec, body = env.do(t, "GET", "/api/admin/devices", nil, adminAuth)
 	if rec.Code != 200 {
 		t.Fatalf("list devices failed: %d %v", rec.Code, body)
@@ -281,47 +213,20 @@ func TestAdminLoginAndCommandDispatchFlow(t *testing.T) {
 		t.Fatalf("expected 1 device, got %d", len(list))
 	}
 
-	// Dispatch a command — this is the "手动下发一条指令" entry point.
-	rec, body = env.do(t, "POST", fmt.Sprintf("/api/admin/devices/%d/commands", env.dev.ID),
-		map[string]any{"type": "reboot"}, adminAuth)
-	if rec.Code != 200 {
-		t.Fatalf("dispatch command failed: %d %v", rec.Code, body)
-	}
-	cmdID := body["id"].(string)
-	if body["status"].(string) != model.CommandStatusPending {
-		t.Fatalf("expected freshly dispatched command to be pending, got %v", body["status"])
+	// Rename it — the only per-device config left (docs §6).
+	rec, body = env.do(t, "PATCH", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID),
+		map[string]any{"name": "客厅传感器"}, adminAuth)
+	if rec.Code != 200 || body["name"] != "客厅传感器" {
+		t.Fatalf("rename device failed: %d %v", rec.Code, body)
 	}
 
-	// The device picks up the pending command on its next report.
-	rec, body = env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did":  testSN,
-		"recs": []map[string]any{{"ts": 2000, "d": map[string]any{"temperature": 25.6}}},
-	}, map[string]string{"X-IoT-Token": deviceToken})
+	// Delete it.
+	rec, _ = env.do(t, "DELETE", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID), nil, adminAuth)
 	if rec.Code != 200 {
-		t.Fatalf("report failed: %d %v", rec.Code, body)
+		t.Fatalf("delete device failed: %d", rec.Code)
 	}
-	cmds := body["cmd"].([]interface{})
-	if len(cmds) != 1 || cmds[0].(map[string]interface{})["id"] != cmdID {
-		t.Fatalf("expected the pending command to be delivered, got %v", body["cmd"])
-	}
-
-	// The device acks it on a later report.
-	rec, _ = env.do(t, "POST", "/api/v1/data/report", map[string]any{
-		"did":  testSN,
-		"recs": []map[string]any{{"ts": 2001, "d": map[string]any{"temperature": 25.7}}},
-		"ack":  []string{cmdID},
-	}, map[string]string{"X-IoT-Token": deviceToken})
-	if rec.Code != 200 {
-		t.Fatalf("ack report failed: %d", rec.Code)
-	}
-
-	// The admin can see it flip to acked.
-	rec, body = env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID), nil, adminAuth)
-	if rec.Code != 200 {
-		t.Fatalf("get device failed: %d %v", rec.Code, body)
-	}
-	commands := body["commands"].([]interface{})
-	if len(commands) != 1 || commands[0].(map[string]interface{})["status"] != model.CommandStatusAcked {
-		t.Fatalf("expected command to be acked, got %v", commands)
+	rec, _ = env.do(t, "GET", fmt.Sprintf("/api/admin/devices/%d", env.dev.ID), nil, adminAuth)
+	if rec.Code != 404 {
+		t.Fatalf("expected deleted device to 404, got %d", rec.Code)
 	}
 }

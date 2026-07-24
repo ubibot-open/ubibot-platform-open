@@ -14,10 +14,7 @@
   "info": {
     "title": "Device Info",
     "status": "Status",
-    "activated": "Activated",
     "online": "Online",
-    "interval": "Sample / Upload Interval",
-    "seconds": "s",
     "createdAt": "Created At",
     "lastSeen": "Last Seen"
   },

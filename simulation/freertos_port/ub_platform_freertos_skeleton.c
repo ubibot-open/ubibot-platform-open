@@ -11,15 +11,14 @@
 #include "task.h"
 /* TODO: #include your RTC / SNTP driver header */
 /* TODO: #include your UART/RTT logging driver header */
-/* TODO: #include your MCU reset header (e.g. CMSIS "core_cm4.h" for NVIC_SystemReset) */
 
 /* Mirrors ub_platform_host.c's g_time_offset trick: most MCUs have no
  * battery-backed RTC accurate enough to trust on its own, so the device
  * tracks an offset from its own tick count and only trusts the *server's*
- * clock (learned via /auth/time or /auth/activate, see ub_device.c). If
- * your board does have a trustworthy RTC, ub_platform_now() can read it
- * directly instead and ub_platform_set_time() can become a no-op (or still
- * correct RTC drift, at your discretion). */
+ * clock (learned via /auth/time or the "t" field of a report response, see
+ * ub_device.c). If your board does have a trustworthy RTC, ub_platform_now()
+ * can read it directly instead and ub_platform_set_time() can become a
+ * no-op (or still correct RTC drift, at your discretion). */
 static int64_t g_time_offset_sec = 0;
 
 int64_t ub_platform_now(void) {
@@ -41,18 +40,6 @@ uint64_t ub_platform_monotonic_ms(void) {
 
 void ub_platform_sleep_ms(uint32_t ms) {
     vTaskDelay(pdMS_TO_TICKS(ms));
-}
-
-void ub_platform_reboot(void) {
-    ub_platform_log("*** reboot requested ***");
-    /* TODO: if this OTA reboot is meant to boot into newly-flashed
-     * firmware, mark it "pending"/"active" in your bootloader's scheme
-     * *before* resetting (see freertos_port/README.md's OTA note) -- a
-     * plain reset alone usually just re-runs the current firmware. */
-    /* TODO: NVIC_SystemReset(); or esp_restart(); or your platform's
-     * equivalent. Does not return. */
-    for (;;) {
-    }
 }
 
 void ub_platform_log(const char *fmt, ...) {

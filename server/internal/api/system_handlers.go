@@ -23,11 +23,6 @@ func (s *Server) SystemMetrics(w http.ResponseWriter, r *http.Request) {
 		adminErr(w, 500, "internal error")
 		return
 	}
-	_, pendingCmds, err := s.Store.ListAllCommands(store.CommandFilter{Status: model.CommandStatusPending}, 1, 1)
-	if err != nil {
-		adminErr(w, 500, "internal error")
-		return
-	}
 	_, openAlerts, err := s.Store.ListAlertEvents(store.AlertFilter{Status: model.AlertStatusOpen}, 1, 1)
 	if err != nil {
 		adminErr(w, 500, "internal error")
@@ -51,7 +46,6 @@ func (s *Server) SystemMetrics(w http.ResponseWriter, r *http.Request) {
 		"uptime_seconds":       int64(time.Since(s.StartedAt).Seconds()),
 		"db_size_bytes":        dbSize,
 		"device_total":         deviceTotal,
-		"pending_commands":     pendingCmds,
 		"open_alerts":          openAlerts,
 		"unread_notifications": unread,
 	})
